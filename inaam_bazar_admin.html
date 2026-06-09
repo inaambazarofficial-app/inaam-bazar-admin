@@ -495,6 +495,9 @@ async function confirmWinner() {
       winnerEmail: selectedWinner.email || '',
       timestamp: firebase.firestore.FieldValue.serverTimestamp(),
     });
+    await db.collection('users').doc(selectedWinner.userId).update({
+      totalWins: firebase.firestore.FieldValue.increment(1),
+    });
     showToast('🏆 Winner confirm ho gaya! ' + selectedWinner.name, false);
     setTimeout(() => loadDashboard(), 1500);
   } catch(e) {
