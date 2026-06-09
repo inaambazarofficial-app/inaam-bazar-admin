@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inaam Bazar Admin Panel</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', sans-serif; background: #1A1A2E; color: #fff; min-height: 100vh; }
+  
+  /* Login Screen */
+  #loginScreen { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+  .login-box { background: #16213E; border: 1px solid rgba(240,165,0,0.3); border-radius: 16px; padding: 40px; text-align: center; width: 360px; }
+  .login-logo { font-size: 60px; margin-bottom: 16px; }
+  .login-title { font-size: 24px; font-weight: bold; color: #F5C518; margin-bottom: 8px; }
+  .login-sub { color: #9E9E9E; font-size: 14px; margin-bottom: 32px; }
+  .google-btn { background: #C0392B; color: white; border: none; padding: 14px 24px; border-radius: 12px; font-size: 16px; font-weight: bold; cursor: pointer; width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; }
+  .google-btn:hover { background: #922B21; }
+  .error-msg { color: #E74C3C; font-size: 13px; margin-top: 16px; display: none; }
+
+  /* Main App */
+  #mainApp { display: none; }
+  .header { background: #C0392B; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; }
+  .header-left { display: flex; align-items: center; gap: 12px; }
+  .header-title { font-size: 20px; font-weight: bold; color: #F5C518; }
+  .header-sub { font-size: 12px; color: rgba(255,255,255,0.7); }
+  .logout-btn { background: rgba(255,255,255,0.15); color: white; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 13px; }
+  .logout-btn:hover { background: rgba(255,255,255,0.25); }
+
+  .content { padding: 24px; max-width: 1000px; margin: 0 auto; }
+
+  /* Stats bar */
+  .stats-bar { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 24px; }
+  .stat-card { background: #16213E; border: 1px solid rgba(240,165,0,0.3); border-radius: 12px; padding: 16px; text-align: center; }
+  .stat-num { font-size: 28px; font-weight: bold; color: #F5C518; }
+  .stat-label { font-size: 12px; color: #9E9E9E; margin-top: 4px; }
+
+  /* Section title */
+  .section-title { font-size: 16px; font-weight: bold; color: #F0A500; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; }
+  .add-draw-btn { background: #27AE60; color: white; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: bold; }
+  .add-draw-btn:hover { background: #1e8449; }
+
+  /* Draw cards */
+  .draw-card { background: #16213E; border: 1px solid rgba(240,165,0,0.3); border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+  .draw-card-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+  .draw-emoji { font-size: 36px; }
+  .draw-info { flex: 1; }
+  .draw-name { font-size: 18px; font-weight: bold; color: white; }
+  .draw-desc { font-size: 13px; color: #9E9E9E; margin-top: 2px; }
+  .draw-value { font-size: 13px; color: #F5C518; margin-top: 2px; }
+  .status-badge { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; }
+  .status-active { background: rgba(39,174,96,0.2); color: #27AE60; border: 1px solid rgba(39,174,96,0.4); }
+  .status-completed { background: rgba(158,158,158,0.2); color: #9E9E9E; border: 1px solid rgba(158,158,158,0.4); }
+
+  .draw-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
+  .draw-stat { background: rgba(0,0,0,0.2); border-radius: 8px; padding: 10px; text-align: center; }
+  .draw-stat-num { font-size: 20px; font-weight: bold; color: #F5C518; }
+  .draw-stat-label { font-size: 11px; color: #9E9E9E; margin-top: 2px; }
+
+  .draw-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+  .btn { padding: 10px 18px; border-radius: 8px; border: none; cursor: pointer; font-size: 14px; font-weight: bold; }
+  .btn-winner { background: #F0A500; color: #3D1F00; }
+  .btn-winner:hover { background: #d4920a; }
+  .btn-winner:disabled { background: #555; color: #999; cursor: not-allowed; }
+  .btn-entries { background: rgba(240,165,0,0.15); color: #F0A500; border: 1px solid rgba(240,165,0,0.4); }
+  .btn-entries:hover { background: rgba(240,165,0,0.25); }
+  .btn-delete { background: rgba(231,76,60,0.15); color: #E74C3C; border: 1px solid rgba(231,76,60,0.4); }
+  .btn-delete:hover { background: rgba(231,76,60,0.25); }
+
+  .winner-box { background: rgba(39,174,96,0.1); border: 1px solid rgba(39,174,96,0.4); border-radius: 8px; padding: 14px; margin-top: 12px; }
+  .winner-box-title { font-size: 12px; color: #27AE60; font-weight: bold; margin-bottom: 6px; }
+  .winner-name { font-size: 16px; font-weight: bold; color: white; }
+  .winner-detail { font-size: 12px; color: #9E9E9E; margin-top: 2px; }
+
+  /* Entries Modal */
+  .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: none; align-items: center; justify-content: center; z-index: 1000; }
+  .modal-overlay.show { display: flex; }
+  .modal { background: #16213E; border: 1px solid rgba(240,165,0,0.3); border-radius: 16px; padding: 24px; width: 90%; max-width: 600px; max-height: 80vh; overflow-y: auto; }
+  .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+  .modal-title { font-size: 18px; font-weight: bold; color: #F5C518; }
+  .modal-close { background: none; border: none; color: #9E9E9E; font-size: 24px; cursor: pointer; }
+  .entry-item { background: rgba(0,0,0,0.2); border-radius: 8px; padding: 12px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+  .entry-user { font-size: 14px; color: white; }
+  .entry-detail { font-size: 12px; color: #9E9E9E; margin-top: 2px; }
+  .entry-tickets { font-size: 13px; color: #F5C518; font-weight: bold; }
+
+  /* Add Draw Modal */
+  .form-group { margin-bottom: 16px; }
+  .form-label { font-size: 13px; color: #9E9E9E; margin-bottom: 6px; display: block; }
+  .form-input { width: 100%; background: rgba(0,0,0,0.3); border: 1px solid rgba(240,165,0,0.3); border-radius: 8px; padding: 10px 14px; color: white; font-size: 14px; outline: none; }
+  .form-input:focus { border-color: #F0A500; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .submit-btn { background: #C0392B; color: white; border: none; padding: 12px 24px; border-radius: 10px; font-size: 15px; font-weight: bold; cursor: pointer; width: 100%; margin-top: 8px; }
+  .submit-btn:hover { background: #922B21; }
+
+  /* Winner confirm modal */
+  .winner-confirm { text-align: center; padding: 10px; }
+  .winner-confirm-emoji { font-size: 60px; margin-bottom: 16px; }
+  .winner-confirm-title { font-size: 20px; font-weight: bold; color: #F5C518; margin-bottom: 8px; }
+  .winner-confirm-name { font-size: 24px; font-weight: bold; color: white; margin-bottom: 4px; }
+  .winner-confirm-detail { font-size: 14px; color: #9E9E9E; margin-bottom: 24px; }
+  .confirm-actions { display: flex; gap: 12px; }
+  .btn-confirm { flex: 1; background: #27AE60; color: white; border: none; padding: 12px; border-radius: 10px; font-size: 15px; font-weight: bold; cursor: pointer; }
+  .btn-confirm:hover { background: #1e8449; }
+  .btn-reroll { flex: 1; background: rgba(240,165,0,0.2); color: #F0A500; border: 1px solid rgba(240,165,0,0.4); padding: 12px; border-radius: 10px; font-size: 15px; font-weight: bold; cursor: pointer; }
+  .btn-reroll:hover { background: rgba(240,165,0,0.3); }
+
+  .loading { text-align: center; color: #9E9E9E; padding: 40px; font-size: 16px; }
+  .toast { position: fixed; bottom: 24px; right: 24px; background: #27AE60; color: white; padding: 14px 20px; border-radius: 10px; font-size: 14px; font-weight: bold; z-index: 9999; display: none; }
+  .toast.error { background: #E74C3C; }
+  .toast.show { display: block; }
+
+  .date-passed { color: #E74C3C; font-size: 12px; margin-top: 2px; }
+  .date-ok { color: #27AE60; font-size: 12px; margin-top: 2px; }
+</style>
+</head>
+<body>
+
+<!-- Login Screen -->
+<div id="loginScreen">
+  <div class="login-box">
+    <div class="login-logo">🎁</div>
+    <div class="login-title">Inaam Bazar</div>
+    <div class="login-sub">Admin Panel — Sirf authorized access</div>
+    <button class="google-btn" onclick="signInWithGoogle()">
+      <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#FFF" d="M44.5 20H24v8.5h11.8C34.7 33.9 30.1 37 24 37c-7.2 0-13-5.8-13-13s5.8-13 13-13c3.1 0 5.9 1.1 8.1 2.9l6.4-6.4C34.6 4.1 29.6 2 24 2 11.8 2 2 11.8 2 24s9.8 22 22 22c11 0 21-8 21-22 0-1.3-.2-2.7-.5-4z"/></svg>
+      Google se Login Karo
+    </button>
+    <div class="error-msg" id="loginError">❌ Sirf admin access allowed hai</div>
+  </div>
+</div>
+
+<!-- Main App -->
+<div id="mainApp">
+  <div class="header">
+    <div class="header-left">
+      <span style="font-size:28px">🎁</span>
+      <div>
+        <div class="header-title">Inaam Bazar Admin</div>
+        <div class="header-sub" id="adminEmail"></div>
+      </div>
+    </div>
+    <button class="logout-btn" onclick="signOut()">Logout</button>
+  </div>
+
+  <div class="content">
+    <div class="stats-bar">
+      <div class="stat-card">
+        <div class="stat-num" id="totalDraws">-</div>
+        <div class="stat-label">Total Draws</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num" id="activeDraws">-</div>
+        <div class="stat-label">Active Draws</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num" id="totalUsers">-</div>
+        <div class="stat-label">Total Users</div>
+      </div>
+    </div>
+
+    <div class="section-title">
+      🎯 Draws Management
+      <button class="add-draw-btn" onclick="showAddDrawModal()">+ New Draw</button>
+    </div>
+
+    <div id="drawsList"><div class="loading">Loading draws...</div></div>
+  </div>
+</div>
+
+<!-- Entries Modal -->
+<div class="modal-overlay" id="entriesModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="entriesModalTitle">Draw Entries</div>
+      <button class="modal-close" onclick="closeModal('entriesModal')">×</button>
+    </div>
+    <div id="entriesList"><div class="loading">Loading...</div></div>
+  </div>
+</div>
+
+<!-- Add Draw Modal -->
+<div class="modal-overlay" id="addDrawModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">➕ New Draw Banao</div>
+      <button class="modal-close" onclick="closeModal('addDrawModal')">×</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Prize Emoji</label>
+      <input class="form-input" id="newEmoji" placeholder="e.g. 📱" value="🎁">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Prize Name</label>
+      <input class="form-input" id="newPrizeName" placeholder="e.g. iPhone 15">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Prize Description</label>
+      <input class="form-input" id="newPrizeDesc" placeholder="e.g. Brand new sealed box">
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Prize Value (PKR)</label>
+        <input class="form-input" id="newPrizeValue" type="number" placeholder="e.g. 50000">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Ticket Cost (1st entry)</label>
+        <input class="form-input" id="newTicketCost" type="number" value="15">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Draw Type</label>
+        <select class="form-input" id="newDrawType" onchange="toggleDrawType()">
+          <option value="date">Date Based</option>
+          <option value="target">Target Based</option>
+        </select>
+      </div>
+      <div class="form-group" id="targetPlayersGroup" style="display:none">
+        <label class="form-label">Target Players</label>
+        <input class="form-input" id="newTargetPlayers" type="number" placeholder="e.g. 1000">
+      </div>
+    </div>
+    <div class="form-group" id="drawDateGroup">
+      <label class="form-label">Draw Date & Time</label>
+      <input class="form-input" id="newDrawDate" type="datetime-local">
+    </div>
+    <button class="submit-btn" onclick="createDraw()">Draw Banao ✅</button>
+  </div>
+</div>
+
+<!-- Winner Confirm Modal -->
+<div class="modal-overlay" id="winnerModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">🏆 Winner Select Karo</div>
+      <button class="modal-close" onclick="closeModal('winnerModal')">×</button>
+    </div>
+    <div class="winner-confirm">
+      <div class="winner-confirm-emoji">🎉</div>
+      <div class="winner-confirm-title">Random Winner Selected!</div>
+      <div class="winner-confirm-name" id="winnerName">-</div>
+      <div class="winner-confirm-detail" id="winnerDetail">-</div>
+      <div class="confirm-actions">
+        <button class="btn-reroll" onclick="rerollWinner()">🔄 Dobara Roll</button>
+        <button class="btn-confirm" onclick="confirmWinner()">✅ Confirm Winner</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- Firebase SDK -->
+<script src="https://cdn.jsdelivr.net/npm/firebase@9.23.0/firebase-app-compat.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/firebase@9.23.0/firebase-auth-compat.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/firebase@9.23.0/firebase-firestore-compat.min.js"></script>
+
+<script>
+const ADMIN_EMAIL = 'inaambazarofficial@gmail.com';
+
+const firebaseConfig = {
+  apiKey: "AIzaSyB0iID0Ux6QRbOpT-7RXg7bigvWK90z0DU",
+  authDomain: "inaam-bazar.firebaseapp.com",
+  projectId: "inaam-bazar",
+  storageBucket: "inaam-bazar.firebasestorage.app",
+  messagingSenderId: "746518709157",
+  appId: "1:746518709157:web:567a1388d92c6d5bd6de4c"
+};
+
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+let currentDrawId = null;
+let currentEntries = [];
+let selectedWinner = null;
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+function signInWithGoogle() {
+  const provider = new firebase.auth.GoogleAuthProvider();
+  provider.setCustomParameters({ login_hint: ADMIN_EMAIL });
+  auth.signInWithPopup(provider).then(result => {
+    const email = result.user.email;
+    if (email !== ADMIN_EMAIL) {
+      auth.signOut();
+      document.getElementById('loginError').style.display = 'block';
+    }
+  }).catch(err => {
+    document.getElementById('loginError').style.display = 'block';
+    document.getElementById('loginError').textContent = '❌ Login failed: ' + err.message;
+  });
+}
+
+function signOut() {
+  auth.signOut();
+}
+
+auth.onAuthStateChanged(user => {
+  if (user && user.email === ADMIN_EMAIL) {
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('mainApp').style.display = 'block';
+    document.getElementById('adminEmail').textContent = user.email;
+    loadDashboard();
+  } else {
+    document.getElementById('loginScreen').style.display = 'flex';
+    document.getElementById('mainApp').style.display = 'none';
+  }
+});
+
+// ── Dashboard ─────────────────────────────────────────────────────────────────
+async function loadDashboard() {
+  try {
+    const drawsSnap = await db.collection('draws').get();
+    const usersSnap = await db.collection('users').get();
+    const draws = drawsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const active = draws.filter(d => d.status === 'active').length;
+
+    document.getElementById('totalDraws').textContent = draws.length;
+    document.getElementById('activeDraws').textContent = active;
+    document.getElementById('totalUsers').textContent = usersSnap.size;
+
+    renderDraws(draws);
+  } catch(e) {
+    document.getElementById('drawsList').innerHTML = '<div class="loading">Error loading draws. Check Firestore rules.</div>';
+  }
+}
+
+function renderDraws(draws) {
+  if (!draws.length) {
+    document.getElementById('drawsList').innerHTML = '<div class="loading">Koi draw nahi mila. Upar se new draw banao!</div>';
+    return;
+  }
+  draws.sort((a,b) => {
+    if (a.status === 'active' && b.status !== 'active') return -1;
+    if (a.status !== 'active' && b.status === 'active') return 1;
+    return 0;
+  });
+  document.getElementById('drawsList').innerHTML = draws.map(draw => buildDrawCard(draw)).join('');
+}
+
+function buildDrawCard(draw) {
+  const isActive = draw.status === 'active';
+  const isCompleted = draw.status === 'completed';
+  const dateStr = draw.drawDate ? new Date(draw.drawDate.seconds * 1000).toLocaleString('en-PK') : 'Target based';
+  const isPassed = draw.drawDate && new Date(draw.drawDate.seconds * 1000) < new Date();
+  const dateClass = isPassed && isActive ? 'date-passed' : 'date-ok';
+  const dateNote = isPassed && isActive ? '⚠️ Date guzar gayi — winner select karo!' : dateStr;
+
+  const winnerBox = isCompleted && draw.winnerName ? `
+    <div class="winner-box">
+      <div class="winner-box-title">🏆 WINNER</div>
+      <div class="winner-name">${draw.winnerName}</div>
+      <div class="winner-detail">${draw.winnerCity || ''} • Draw completed</div>
+    </div>` : '';
+
+  return `
+    <div class="draw-card">
+      <div class="draw-card-header">
+        <div class="draw-emoji">${draw.prizeEmoji || '🎁'}</div>
+        <div class="draw-info">
+          <div class="draw-name">${draw.prizeName}</div>
+          <div class="draw-desc">${draw.prizeDescription || ''}</div>
+          <div class="draw-value">PKR ${(draw.prizeValue || 0).toLocaleString()}</div>
+          <div class="${dateClass}">${dateNote}</div>
+        </div>
+        <span class="status-badge ${isActive ? 'status-active' : 'status-completed'}">
+          ${isActive ? '🟢 Active' : '✅ Completed'}
+        </span>
+      </div>
+      <div class="draw-stats">
+        <div class="draw-stat">
+          <div class="draw-stat-num">${draw.currentEntries || 0}</div>
+          <div class="draw-stat-label">Total Entries</div>
+        </div>
+        <div class="draw-stat">
+          <div class="draw-stat-num">${draw.ticketCost || 15}</div>
+          <div class="draw-stat-label">Ticket Cost</div>
+        </div>
+        <div class="draw-stat">
+          <div class="draw-stat-num">${draw.isTargetBased ? draw.targetPlayers : 'Date'}</div>
+          <div class="draw-stat-label">${draw.isTargetBased ? 'Target' : 'Based'}</div>
+        </div>
+      </div>
+      ${winnerBox}
+      <div class="draw-actions">
+        <button class="btn btn-entries" onclick="viewEntries('${draw.id}', '${draw.prizeName}')">👥 Entries Dekho</button>
+        ${isActive ? `<button class="btn btn-winner" onclick="selectWinner('${draw.id}')">🏆 Winner Chuno</button>` : ''}
+        <button class="btn btn-delete" onclick="deleteDraw('${draw.id}', '${draw.prizeName}')">🗑️ Delete</button>
+      </div>
+    </div>`;
+}
+
+// ── View Entries ──────────────────────────────────────────────────────────────
+async function viewEntries(drawId, drawName) {
+  document.getElementById('entriesModalTitle').textContent = '👥 ' + drawName + ' — Entries';
+  document.getElementById('entriesList').innerHTML = '<div class="loading">Loading entries...</div>';
+  document.getElementById('entriesModal').classList.add('show');
+
+  try {
+    const snap = await db.collection('entries').where('drawId', '==', drawId).get();
+    if (snap.empty) {
+      document.getElementById('entriesList').innerHTML = '<div class="loading">Koi entry nahi mili abhi tak.</div>';
+      return;
+    }
+    const userIds = [...new Set(snap.docs.map(d => d.data().userId))];
+    const userMap = {};
+    for (const uid of userIds) {
+      try {
+        const uDoc = await db.collection('users').doc(uid).get();
+        if (uDoc.exists) userMap[uid] = uDoc.data();
+      } catch(e) {}
+    }
+    const html = snap.docs.map(doc => {
+      const e = doc.data();
+      const user = userMap[e.userId] || {};
+      const name = user.name || 'Unknown User';
+      const ts = e.timestamp ? new Date(e.timestamp.seconds * 1000).toLocaleString('en-PK') : '';
+      return `
+        <div class="entry-item">
+          <div>
+            <div class="entry-user">${name}</div>
+            <div class="entry-detail">Entry #${e.entryNumber || '?'} • ${ts}</div>
+          </div>
+          <div class="entry-tickets">${e.ticketsSpent || 0} tickets</div>
+        </div>`;
+    }).join('');
+    document.getElementById('entriesList').innerHTML = html;
+  } catch(e) {
+    document.getElementById('entriesList').innerHTML = '<div class="loading">Error: ' + e.message + '</div>';
+  }
+}
+
+// ── Winner Selection ──────────────────────────────────────────────────────────
+async function selectWinner(drawId) {
+  currentDrawId = drawId;
+  currentEntries = [];
+  showToast('Entries load ho rahi hain...', false);
+
+  try {
+    const snap = await db.collection('entries').where('drawId', '==', drawId).get();
+    if (snap.empty) { showToast('❌ Koi entry nahi hai is draw mein!', true); return; }
+
+    const userIds = snap.docs.map(d => d.data().userId);
+    const userMap = {};
+    for (const uid of [...new Set(userIds)]) {
+      try {
+        const uDoc = await db.collection('users').doc(uid).get();
+        if (uDoc.exists) userMap[uid] = uDoc.data();
+      } catch(e) {}
+    }
+    currentEntries = snap.docs.map(d => {
+      const data = d.data();
+      const user = userMap[data.userId] || {};
+      return { userId: data.userId, name: user.name || 'Unknown', email: user.email || '', phone: user.phone || '' };
+    });
+    pickRandomAndShow();
+  } catch(e) {
+    showToast('❌ Error: ' + e.message, true);
+  }
+}
+
+function pickRandomAndShow() {
+  if (!currentEntries.length) return;
+  const idx = Math.floor(Math.random() * currentEntries.length);
+  selectedWinner = currentEntries[idx];
+  document.getElementById('winnerName').textContent = selectedWinner.name;
+  document.getElementById('winnerDetail').textContent = 
+    (selectedWinner.email || selectedWinner.phone || selectedWinner.userId) + 
+    ' • ' + currentEntries.length + ' entries mein se chuna gaya';
+  document.getElementById('winnerModal').classList.add('show');
+}
+
+function rerollWinner() { pickRandomAndShow(); }
+
+async function confirmWinner() {
+  if (!selectedWinner || !currentDrawId) return;
+  closeModal('winnerModal');
+  showToast('Winner save ho raha hai...', false);
+
+  try {
+    await db.collection('draws').doc(currentDrawId).update({
+      status: 'completed',
+      winnerId: selectedWinner.userId,
+      winnerName: selectedWinner.name,
+      winnerCity: '',
+      winnerEmail: selectedWinner.email || '',
+      completedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    await db.collection('winners').add({
+      drawId: currentDrawId,
+      userId: selectedWinner.userId,
+      winnerName: selectedWinner.name,
+      winnerEmail: selectedWinner.email || '',
+      timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    showToast('🏆 Winner confirm ho gaya! ' + selectedWinner.name, false);
+    setTimeout(() => loadDashboard(), 1500);
+  } catch(e) {
+    showToast('❌ Error saving winner: ' + e.message, true);
+  }
+}
+
+// ── Add Draw ──────────────────────────────────────────────────────────────────
+function showAddDrawModal() {
+  document.getElementById('addDrawModal').classList.add('show');
+}
+
+function toggleDrawType() {
+  const type = document.getElementById('newDrawType').value;
+  document.getElementById('targetPlayersGroup').style.display = type === 'target' ? 'block' : 'none';
+  document.getElementById('drawDateGroup').style.display = type === 'date' ? 'block' : 'none';
+}
+
+async function createDraw() {
+  const prizeName = document.getElementById('newPrizeName').value.trim();
+  const prizeEmoji = document.getElementById('newEmoji').value.trim();
+  const prizeDesc = document.getElementById('newPrizeDesc').value.trim();
+  const prizeValue = parseInt(document.getElementById('newPrizeValue').value) || 0;
+  const ticketCost = parseInt(document.getElementById('newTicketCost').value) || 15;
+  const drawType = document.getElementById('newDrawType').value;
+  const isTargetBased = drawType === 'target';
+
+  if (!prizeName) { showToast('❌ Prize name daalo!', true); return; }
+
+  const data = {
+    prizeName, prizeEmoji, prizeDescription: prizeDesc,
+    prizeValue, ticketCost, isTargetBased,
+    status: 'active', currentEntries: 0, isFeatured: false,
+    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+  };
+
+  if (isTargetBased) {
+    data.targetPlayers = parseInt(document.getElementById('newTargetPlayers').value) || 100;
+    data.drawDate = null;
+  } else {
+    const dateVal = document.getElementById('newDrawDate').value;
+    if (!dateVal) { showToast('❌ Draw date daalo!', true); return; }
+    data.drawDate = firebase.firestore.Timestamp.fromDate(new Date(dateVal));
+    data.targetPlayers = 0;
+  }
+
+  try {
+    await db.collection('draws').add(data);
+    closeModal('addDrawModal');
+    showToast('✅ Naya draw ban gaya!', false);
+    setTimeout(() => loadDashboard(), 1000);
+  } catch(e) {
+    showToast('❌ Error: ' + e.message, true);
+  }
+}
+
+// ── Delete Draw ───────────────────────────────────────────────────────────────
+async function deleteDraw(drawId, name) {
+  if (!confirm('Kya aap "' + name + '" delete karna chahte hain? Yeh wapis nahi aayega!')) return;
+  try {
+    await db.collection('draws').doc(drawId).delete();
+    showToast('🗑️ Draw delete ho gaya', false);
+    setTimeout(() => loadDashboard(), 800);
+  } catch(e) {
+    showToast('❌ Error: ' + e.message, true);
+  }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+
+function showToast(msg, isError) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (isError ? ' error' : '');
+  setTimeout(() => t.className = 'toast', 3000);
+}
+
+window.onclick = function(e) {
+  ['entriesModal','addDrawModal','winnerModal'].forEach(id => {
+    const el = document.getElementById(id);
+    if (e.target === el) el.classList.remove('show');
+  });
+};
+</script>
+</body>
+</html>
