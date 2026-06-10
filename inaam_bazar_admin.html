@@ -229,6 +229,69 @@
   </div>
 </div>
 
+<!-- Edit Draw Modal -->
+<div class="modal-overlay" id="editDrawModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">✏️ Draw Edit Karo</div>
+      <button class="modal-close" onclick="closeModal('editDrawModal')">×</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Prize Emoji</label>
+      <input class="form-input" id="editEmoji">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Prize Name</label>
+      <input class="form-input" id="editPrizeName">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Prize Description</label>
+      <input class="form-input" id="editPrizeDesc">
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Prize Value (PKR)</label>
+        <input class="form-input" id="editPrizeValue" type="number">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Ticket Cost (1st entry)</label>
+        <input class="form-input" id="editTicketCost" type="number">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Draw Type</label>
+        <select class="form-input" id="editDrawType" onchange="toggleEditDrawType()">
+          <option value="date">Date Based</option>
+          <option value="target">Target Based</option>
+        </select>
+      </div>
+      <div class="form-group" id="editTargetPlayersGroup">
+        <label class="form-label">Target Players</label>
+        <input class="form-input" id="editTargetPlayers" type="number">
+      </div>
+    </div>
+    <div class="form-group" id="editDrawDateGroup">
+      <label class="form-label">Draw Date & Time</label>
+      <input class="form-input" id="editDrawDate" type="datetime-local">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Status</label>
+      <select class="form-input" id="editStatus">
+        <option value="active">Active</option>
+        <option value="completed">Completed</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Featured</label>
+      <select class="form-input" id="editFeatured">
+        <option value="false">No</option>
+        <option value="true">Yes — Featured Carousel Mein Dikhao</option>
+      </select>
+    </div>
+    <button class="submit-btn" onclick="saveEditDraw()">Changes Save Karo ✅</button>
+  </div>
+</div>
 <!-- Winner Confirm Modal -->
 <div class="modal-overlay" id="winnerModal">
   <div class="modal">
@@ -386,6 +449,7 @@ function buildDrawCard(draw) {
       ${winnerBox}
       <div class="draw-actions">
         <button class="btn btn-entries" onclick="viewEntries('${draw.id}', '${draw.prizeName}')">👥 Entries Dekho</button>
+        <button class="btn" style="background:rgba(52,152,219,0.2);color:#3498DB;border:1px solid rgba(52,152,219,0.4);" onclick='showEditDrawModal(${JSON.stringify(draw)})'>✏️ Edit</button>
         ${isActive ? `<button class="btn btn-winner" onclick="selectWinner('${draw.id}')">🏆 Winner Chuno</button>` : ''}
         ${isActive ? `<button class="btn" style="background:${draw.isFeatured ? 'rgba(240,165,0,0.3)' : 'rgba(255,255,255,0.1)'}; color:${draw.isFeatured ? '#F0A500' : '#fff'}; border:1px solid ${draw.isFeatured ? '#F0A500' : 'rgba(255,255,255,0.2)'};" onclick="toggleFeatured('${draw.id}', ${draw.isFeatured})">${draw.isFeatured ? '⭐ Featured' : '☆ Feature Karo'}</button>` : ''}
         <button class="btn btn-delete" onclick="deleteDraw('${draw.id}', '${draw.prizeName}')">🗑️ Delete</button>
@@ -550,6 +614,79 @@ async function createDraw() {
     closeModal('addDrawModal');
     showToast('✅ Naya draw ban gaya!', false);
     setTimeout(() => loadDashboard(), 1000);
+  } catch(e) {
+    showToast('❌ Error: ' + e.message, true);
+  }
+}
+
+// ── Edit Draw ─────────────────────────────────────────────────────────────────
+let editingDrawId = null;
+
+function showEditDrawModal(draw) {
+  editingDrawId = draw.id;
+  document.getElementById('editEmoji').value = draw.prizeEmoji || '🎁';
+  document.getElementById('editPrizeName').value = draw.prizeName || '';
+  document.getElementById('editPrizeDesc').value = draw.prizeDescription || '';
+  document.getElementById('editPrizeValue').value = draw.prizeValue || 0;
+  document.getElementById('editTicketCost').value = draw.ticketCost || 15;
+  document.getElementById('editStatus').value = draw.status || 'active';
+  document.getElementById('editFeatured').value = draw.isFeatured ? 'true' : 'false';
+
+  const isTarget = draw.isTargetBased;
+  document.getElementById('editDrawType').value = isTarget ? 'target' : 'date';
+  document.getElementById('editTargetPlayersGroup').style.display = isTarget ? 'block' : 'none';
+  document.getElementById('editDrawDateGroup').style.display = isTarget ? 'none' : 'block';
+
+  if (isTarget) {
+    document.getElementById('editTargetPlayers').value = draw.targetPlayers || 0;
+  } else if (draw.drawDate) {
+    const date = new Date(draw.drawDate.seconds * 1000);
+    const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+    document.getElementById('editDrawDate').value = local.toISOString().slice(0, 16);
+  }
+
+  document.getElementById('editDrawModal').classList.add('show');
+}
+
+function toggleEditDrawType() {
+  const type = document.getElementById('editDrawType').value;
+  document.getElementById('editTargetPlayersGroup').style.display = type === 'target' ? 'block' : 'none';
+  document.getElementById('editDrawDateGroup').style.display = type === 'date' ? 'block' : 'none';
+}
+
+async function saveEditDraw() {
+  if (!editingDrawId) return;
+
+  const drawType = document.getElementById('editDrawType').value;
+  const isTargetBased = drawType === 'target';
+
+  const data = {
+    prizeEmoji: document.getElementById('editEmoji').value.trim(),
+    prizeName: document.getElementById('editPrizeName').value.trim(),
+    prizeDescription: document.getElementById('editPrizeDesc').value.trim(),
+    prizeValue: parseInt(document.getElementById('editPrizeValue').value) || 0,
+    ticketCost: parseInt(document.getElementById('editTicketCost').value) || 15,
+    status: document.getElementById('editStatus').value,
+    isFeatured: document.getElementById('editFeatured').value === 'true',
+    isTargetBased: isTargetBased,
+  };
+
+  if (isTargetBased) {
+    data.targetPlayers = parseInt(document.getElementById('editTargetPlayers').value) || 0;
+    data.drawDate = null;
+  } else {
+    const dateVal = document.getElementById('editDrawDate').value;
+    if (dateVal) {
+      data.drawDate = firebase.firestore.Timestamp.fromDate(new Date(dateVal));
+    }
+    data.targetPlayers = 0;
+  }
+
+  try {
+    await db.collection('draws').doc(editingDrawId).update(data);
+    closeModal('editDrawModal');
+    showToast('✅ Draw update ho gaya!', false);
+    setTimeout(() => loadDashboard(), 800);
   } catch(e) {
     showToast('❌ Error: ' + e.message, true);
   }
