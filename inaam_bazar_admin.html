@@ -387,6 +387,7 @@ function buildDrawCard(draw) {
       <div class="draw-actions">
         <button class="btn btn-entries" onclick="viewEntries('${draw.id}', '${draw.prizeName}')">👥 Entries Dekho</button>
         ${isActive ? `<button class="btn btn-winner" onclick="selectWinner('${draw.id}')">🏆 Winner Chuno</button>` : ''}
+        ${isActive ? `<button class="btn" style="background:${draw.isFeatured ? 'rgba(240,165,0,0.3)' : 'rgba(255,255,255,0.1)'}; color:${draw.isFeatured ? '#F0A500' : '#fff'}; border:1px solid ${draw.isFeatured ? '#F0A500' : 'rgba(255,255,255,0.2)'};" onclick="toggleFeatured('${draw.id}', ${draw.isFeatured})">${draw.isFeatured ? '⭐ Featured' : '☆ Feature Karo'}</button>` : ''}
         <button class="btn btn-delete" onclick="deleteDraw('${draw.id}', '${draw.prizeName}')">🗑️ Delete</button>
       </div>
     </div>`;
@@ -555,6 +556,18 @@ async function createDraw() {
 }
 
 // ── Delete Draw ───────────────────────────────────────────────────────────────
+async function toggleFeatured(drawId, currentFeatured) {
+  try {
+    await db.collection('draws').doc(drawId).update({
+      isFeatured: !currentFeatured,
+    });
+    showToast(currentFeatured ? '☆ Featured hata diya' : '⭐ Featured kar diya!', false);
+    setTimeout(() => loadDashboard(), 800);
+  } catch(e) {
+    showToast('❌ Error: ' + e.message, true);
+  }
+}
+
 async function deleteDraw(drawId, name) {
   if (!confirm('Kya aap "' + name + '" delete karna chahte hain? Yeh wapis nahi aayega!')) return;
   try {
