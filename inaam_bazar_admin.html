@@ -564,6 +564,27 @@ async function confirmWinner() {
       totalWins: firebase.firestore.FieldValue.increment(1),
     });
     showToast('🏆 Winner confirm ho gaya! ' + selectedWinner.name, false);
+    
+    // Save winner notification
+    await db.collection('notifications').add({
+      userId: selectedWinner.userId,
+      title: '🏆 Mubarak Ho! Aap Ne Jeeta!',
+      body: 'Aap ne draw jeeta! Admin 48 ghante mein aapse rabta karega.',
+      type: 'winner',
+      sent: false,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // Save loser notifications via topic
+    await db.collection('broadcast_notifications').add({
+      title: '🎁 Naya Draw Result!',
+      body: 'Is baar kismat ne saath nahi diya! Agli baar zaroor jeetenge. Try karte raho! 💪',
+      topic: 'all_users',
+      type: 'draw_result',
+      sent: false,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+
     setTimeout(() => loadDashboard(), 1500);
   } catch(e) {
     showToast('❌ Error saving winner: ' + e.message, true);
@@ -613,6 +634,17 @@ async function createDraw() {
     await db.collection('draws').add(data);
     closeModal('addDrawModal');
     showToast('✅ Naya draw ban gaya!', false);
+
+    // Notify all users about new draw
+    await db.collection('broadcast_notifications').add({
+      title: '🎉 Naya Draw Available!',
+      body: `${data.prizeName} — Ab enter karo aur jeetnay ka mauka pao!`,
+      topic: 'new_draws',
+      type: 'new_draw',
+      sent: false,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+
     setTimeout(() => loadDashboard(), 1000);
   } catch(e) {
     showToast('❌ Error: ' + e.message, true);
