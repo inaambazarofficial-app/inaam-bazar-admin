@@ -204,9 +204,23 @@
         <input class="form-input" id="newPrizeValue" type="number" placeholder="e.g. 50000">
       </div>
       <div class="form-group">
-        <label class="form-label">Ticket Cost (1st entry)</label>
+        <label class="form-label">1st Entry Ticket Cost</label>
         <input class="form-input" id="newTicketCost" type="number" value="15">
       </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">2nd Entry Cost</label>
+        <input class="form-input" id="newTicketCost2" type="number" value="25">
+      </div>
+      <div class="form-group">
+        <label class="form-label">3rd Entry Cost</label>
+        <input class="form-input" id="newTicketCost3" type="number" value="40">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">4th Entry Cost</label>
+      <input class="form-input" id="newTicketCost4" type="number" value="60">
     </div>
     <div class="form-row">
       <div class="form-group">
@@ -396,9 +410,12 @@ function renderDraws(draws) {
     return;
   }
   draws.sort((a,b) => {
+    // Active draws first, then by date newest first
     if (a.status === 'active' && b.status !== 'active') return -1;
     if (a.status !== 'active' && b.status === 'active') return 1;
-    return 0;
+    const aDate = a.createdAt ? a.createdAt.seconds : 0;
+    const bDate = b.createdAt ? b.createdAt.seconds : 0;
+    return bDate - aDate;
   });
   document.getElementById('drawsList').innerHTML = draws.map(draw => buildDrawCard(draw)).join('');
 }
@@ -614,9 +631,14 @@ async function createDraw() {
 
   if (!prizeName) { showToast('❌ Prize name daalo!', true); return; }
 
+  const ticketCost2 = parseInt(document.getElementById('newTicketCost2').value) || 25;
+  const ticketCost3 = parseInt(document.getElementById('newTicketCost3').value) || 40;
+  const ticketCost4 = parseInt(document.getElementById('newTicketCost4').value) || 60;
+
   const data = {
     prizeName, prizeEmoji, prizeDescription: prizeDesc,
-    prizeValue, ticketCost, isTargetBased,
+    prizeValue, ticketCost, ticketCost2, ticketCost3, ticketCost4,
+    isTargetBased,
     status: 'active', currentEntries: 0, isFeatured: false,
     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
   };
@@ -767,6 +789,23 @@ async function toggleFeatured(drawId, currentFeatured) {
 async function deleteDraw(drawId, name) {
   if (!confirm('Kya aap "' + name + '" delete karna chahte hain? Yeh wapis nahi aayega!')) return;
   try {
+    // Check if draw has winner — save to winners collection first
+    const drawDoc = await db.collection('draws').doc(drawId).get();
+    const drawData = drawDoc.data();
+    if (drawData && drawData.winnerName) {
+      await db.collection('archived_winners').add({
+        drawId: drawId,
+        prizeName: drawData.prizeName,
+        prizeEmoji: drawData.prizeEmoji,
+        prizeValue: drawData.prizeValue,
+        winnerName: drawData.winnerName,
+        winnerEmail: drawData.winnerEmail || '',
+        winnerCity: drawData.winnerCity || '',
+        drawDate: drawData.drawDate,
+        completedAt: drawData.completedAt,
+        archivedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+    }
     await db.collection('draws').doc(drawId).delete();
     showToast('🗑️ Draw delete ho gaya', false);
     setTimeout(() => loadDashboard(), 800);
