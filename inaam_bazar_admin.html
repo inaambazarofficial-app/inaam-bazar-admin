@@ -547,12 +547,12 @@ async function confirmWinner() {
 
   try {
     await db.collection('draws').doc(currentDrawId).update({
-      status: 'completed',
+      status: 'active',
       winnerId: selectedWinner.userId,
       winnerName: selectedWinner.name,
       winnerCity: '',
       winnerEmail: selectedWinner.email || '',
-      completedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      pendingCompletion: true,
     });
     await db.collection('winners').add({
       drawId: currentDrawId,
