@@ -468,7 +468,8 @@ function buildDrawCard(draw) {
         <button class="btn btn-entries" onclick="viewEntries('${draw.id}', '${draw.prizeName}')">👥 Entries Dekho</button>
         <button class="btn" style="background:rgba(52,152,219,0.2);color:#3498DB;border:1px solid rgba(52,152,219,0.4);" onclick='showEditDrawModal(${JSON.stringify(draw)})'>✏️ Edit</button>
         ${isActive ? `<button class="btn btn-winner" onclick="selectWinner('${draw.id}')">🏆 Winner Chuno</button>` : ''}
-        ${isCompleted && draw.winnerName ? `<button class="btn" style="background:rgba(155,89,182,0.3);color:#9B59B6;border:1px solid rgba(155,89,182,0.5);" onclick="startLiveDraw('${draw.id}', '${draw.prizeName}', '${draw.prizeEmoji}', '${draw.winnerName}')">🎬 Live Draw Chalao</button>` : ''}
+        ${draw.winnerName && draw.pendingCompletion ? `<button class="btn" style="background:rgba(155,89,182,0.3);color:#9B59B6;border:1px solid rgba(155,89,182,0.5);" onclick="startLiveDraw('${draw.id}', '${draw.prizeName}', '${draw.prizeEmoji}', '${draw.winnerName}')">🎬 Live Draw Chalao</button>` : ''}
+        ${isCompleted && draw.winnerName && !draw.pendingCompletion ? `<button class="btn" style="background:rgba(155,89,182,0.3);color:#9B59B6;border:1px solid rgba(155,89,182,0.5);" onclick="startLiveDraw('${draw.id}', '${draw.prizeName}', '${draw.prizeEmoji}', '${draw.winnerName}')">🎬 Live Draw Chalao</button>` : ''}
         ${isActive ? `<button class="btn" style="background:${draw.isFeatured ? 'rgba(240,165,0,0.3)' : 'rgba(255,255,255,0.1)'}; color:${draw.isFeatured ? '#F0A500' : '#fff'}; border:1px solid ${draw.isFeatured ? '#F0A500' : 'rgba(255,255,255,0.2)'};" onclick="toggleFeatured('${draw.id}', ${draw.isFeatured})">${draw.isFeatured ? '⭐ Featured' : '☆ Feature Karo'}</button>` : ''}
         <button class="btn btn-delete" onclick="deleteDraw('${draw.id}', '${draw.prizeName}')">🗑️ Delete</button>
       </div>
