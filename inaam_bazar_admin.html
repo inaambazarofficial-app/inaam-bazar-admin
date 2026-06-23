@@ -7,8 +7,6 @@
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: 'Segoe UI', sans-serif; background: #1A1A2E; color: #fff; min-height: 100vh; }
-  
-  /* Login Screen */
   #loginScreen { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
   .login-box { background: #16213E; border: 1px solid rgba(240,165,0,0.3); border-radius: 16px; padding: 40px; text-align: center; width: 360px; }
   .login-logo { font-size: 60px; margin-bottom: 16px; }
@@ -17,8 +15,6 @@
   .google-btn { background: #C0392B; color: white; border: none; padding: 14px 24px; border-radius: 12px; font-size: 16px; font-weight: bold; cursor: pointer; width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; }
   .google-btn:hover { background: #922B21; }
   .error-msg { color: #E74C3C; font-size: 13px; margin-top: 16px; display: none; }
-
-  /* Main App */
   #mainApp { display: none; }
   .header { background: #C0392B; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; }
   .header-left { display: flex; align-items: center; gap: 12px; }
@@ -26,21 +22,14 @@
   .header-sub { font-size: 12px; color: rgba(255,255,255,0.7); }
   .logout-btn { background: rgba(255,255,255,0.15); color: white; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 13px; }
   .logout-btn:hover { background: rgba(255,255,255,0.25); }
-
   .content { padding: 24px; max-width: 1000px; margin: 0 auto; }
-
-  /* Stats bar */
   .stats-bar { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 24px; }
   .stat-card { background: #16213E; border: 1px solid rgba(240,165,0,0.3); border-radius: 12px; padding: 16px; text-align: center; }
   .stat-num { font-size: 28px; font-weight: bold; color: #F5C518; }
   .stat-label { font-size: 12px; color: #9E9E9E; margin-top: 4px; }
-
-  /* Section title */
   .section-title { font-size: 16px; font-weight: bold; color: #F0A500; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; }
   .add-draw-btn { background: #27AE60; color: white; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: bold; }
   .add-draw-btn:hover { background: #1e8449; }
-
-  /* Draw cards */
   .draw-card { background: #16213E; border: 1px solid rgba(240,165,0,0.3); border-radius: 12px; padding: 20px; margin-bottom: 16px; }
   .draw-card-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
   .draw-emoji { font-size: 36px; }
@@ -51,28 +40,22 @@
   .status-badge { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; }
   .status-active { background: rgba(39,174,96,0.2); color: #27AE60; border: 1px solid rgba(39,174,96,0.4); }
   .status-completed { background: rgba(158,158,158,0.2); color: #9E9E9E; border: 1px solid rgba(158,158,158,0.4); }
-
   .draw-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
   .draw-stat { background: rgba(0,0,0,0.2); border-radius: 8px; padding: 10px; text-align: center; }
   .draw-stat-num { font-size: 20px; font-weight: bold; color: #F5C518; }
   .draw-stat-label { font-size: 11px; color: #9E9E9E; margin-top: 2px; }
-
   .draw-actions { display: flex; gap: 10px; flex-wrap: wrap; }
   .btn { padding: 10px 18px; border-radius: 8px; border: none; cursor: pointer; font-size: 14px; font-weight: bold; }
   .btn-winner { background: #F0A500; color: #3D1F00; }
   .btn-winner:hover { background: #d4920a; }
-  .btn-winner:disabled { background: #555; color: #999; cursor: not-allowed; }
   .btn-entries { background: rgba(240,165,0,0.15); color: #F0A500; border: 1px solid rgba(240,165,0,0.4); }
   .btn-entries:hover { background: rgba(240,165,0,0.25); }
   .btn-delete { background: rgba(231,76,60,0.15); color: #E74C3C; border: 1px solid rgba(231,76,60,0.4); }
   .btn-delete:hover { background: rgba(231,76,60,0.25); }
-
   .winner-box { background: rgba(39,174,96,0.1); border: 1px solid rgba(39,174,96,0.4); border-radius: 8px; padding: 14px; margin-top: 12px; }
   .winner-box-title { font-size: 12px; color: #27AE60; font-weight: bold; margin-bottom: 6px; }
   .winner-name { font-size: 16px; font-weight: bold; color: white; }
   .winner-detail { font-size: 12px; color: #9E9E9E; margin-top: 2px; }
-
-  /* Entries Modal */
   .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: none; align-items: center; justify-content: center; z-index: 1000; }
   .modal-overlay.show { display: flex; }
   .modal { background: #16213E; border: 1px solid rgba(240,165,0,0.3); border-radius: 16px; padding: 24px; width: 90%; max-width: 600px; max-height: 80vh; overflow-y: auto; }
@@ -83,8 +66,6 @@
   .entry-user { font-size: 14px; color: white; }
   .entry-detail { font-size: 12px; color: #9E9E9E; margin-top: 2px; }
   .entry-tickets { font-size: 13px; color: #F5C518; font-weight: bold; }
-
-  /* Add Draw Modal */
   .form-group { margin-bottom: 16px; }
   .form-label { font-size: 13px; color: #9E9E9E; margin-bottom: 6px; display: block; }
   .form-input { width: 100%; background: rgba(0,0,0,0.3); border: 1px solid rgba(240,165,0,0.3); border-radius: 8px; padding: 10px 14px; color: white; font-size: 14px; outline: none; }
@@ -92,8 +73,6 @@
   .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .submit-btn { background: #C0392B; color: white; border: none; padding: 12px 24px; border-radius: 10px; font-size: 15px; font-weight: bold; cursor: pointer; width: 100%; margin-top: 8px; }
   .submit-btn:hover { background: #922B21; }
-
-  /* Winner confirm modal */
   .winner-confirm { text-align: center; padding: 10px; }
   .winner-confirm-emoji { font-size: 60px; margin-bottom: 16px; }
   .winner-confirm-title { font-size: 20px; font-weight: bold; color: #F5C518; margin-bottom: 8px; }
@@ -104,14 +83,13 @@
   .btn-confirm:hover { background: #1e8449; }
   .btn-reroll { flex: 1; background: rgba(240,165,0,0.2); color: #F0A500; border: 1px solid rgba(240,165,0,0.4); padding: 12px; border-radius: 10px; font-size: 15px; font-weight: bold; cursor: pointer; }
   .btn-reroll:hover { background: rgba(240,165,0,0.3); }
-
   .loading { text-align: center; color: #9E9E9E; padding: 40px; font-size: 16px; }
   .toast { position: fixed; bottom: 24px; right: 24px; background: #27AE60; color: white; padding: 14px 20px; border-radius: 10px; font-size: 14px; font-weight: bold; z-index: 9999; display: none; }
   .toast.error { background: #E74C3C; }
   .toast.show { display: block; }
-
   .date-passed { color: #E74C3C; font-size: 12px; margin-top: 2px; }
   .date-ok { color: #27AE60; font-size: 12px; margin-top: 2px; }
+  .pending-box { background: rgba(155,89,182,0.1); border: 1px solid rgba(155,89,182,0.4); border-radius: 8px; padding: 14px; margin-top: 12px; }
 </style>
 </head>
 <body>
@@ -145,25 +123,21 @@
 
   <div class="content">
     <div class="stats-bar">
-      <div class="stat-card">
-        <div class="stat-num" id="totalDraws">-</div>
-        <div class="stat-label">Total Draws</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-num" id="activeDraws">-</div>
-        <div class="stat-label">Active Draws</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-num" id="totalUsers">-</div>
-        <div class="stat-label">Total Users</div>
-      </div>
+      <div class="stat-card"><div class="stat-num" id="totalDraws">-</div><div class="stat-label">Total Draws</div></div>
+      <div class="stat-card"><div class="stat-num" id="activeDraws">-</div><div class="stat-label">Active Draws</div></div>
+      <div class="stat-card"><div class="stat-num" id="totalUsers">-</div><div class="stat-label">Total Users</div></div>
     </div>
 
     <div class="section-title">
+      🎁 Pending Referral Rewards
+      <button class="add-draw-btn" style="background:#8E44AD;" onclick="loadPendingReferrals()">🔄 Refresh</button>
+    </div>
+    <div id="pendingReferralsList"><div class="loading">Loading...</div></div>
+
+    <div class="section-title" style="margin-top:24px;">
       🎯 Draws Management
       <button class="add-draw-btn" onclick="showAddDrawModal()">+ New Draw</button>
     </div>
-
     <div id="drawsList"><div class="loading">Loading draws...</div></div>
   </div>
 </div>
@@ -204,7 +178,7 @@
         <input class="form-input" id="newPrizeValue" type="number" placeholder="e.g. 50000">
       </div>
       <div class="form-group">
-        <label class="form-label">1st Entry Ticket Cost</label>
+        <label class="form-label">1st Entry Cost</label>
         <input class="form-input" id="newTicketCost" type="number" value="15">
       </div>
     </div>
@@ -268,9 +242,23 @@
         <input class="form-input" id="editPrizeValue" type="number">
       </div>
       <div class="form-group">
-        <label class="form-label">Ticket Cost (1st entry)</label>
+        <label class="form-label">1st Entry Cost</label>
         <input class="form-input" id="editTicketCost" type="number">
       </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">2nd Entry Cost</label>
+        <input class="form-input" id="editTicketCost2" type="number">
+      </div>
+      <div class="form-group">
+        <label class="form-label">3rd Entry Cost</label>
+        <input class="form-input" id="editTicketCost3" type="number">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">4th Entry Cost</label>
+      <input class="form-input" id="editTicketCost4" type="number">
     </div>
     <div class="form-row">
       <div class="form-group">
@@ -306,6 +294,7 @@
     <button class="submit-btn" onclick="saveEditDraw()">Changes Save Karo ✅</button>
   </div>
 </div>
+
 <!-- Winner Confirm Modal -->
 <div class="modal-overlay" id="winnerModal">
   <div class="modal">
@@ -336,7 +325,6 @@
 
 <script>
 const ADMIN_EMAIL = 'inaambazarofficial@gmail.com';
-
 const firebaseConfig = {
   apiKey: "AIzaSyB0iID0Ux6QRbOpT-7RXg7bigvWK90z0DU",
   authDomain: "inaam-bazar.firebaseapp.com",
@@ -345,11 +333,9 @@ const firebaseConfig = {
   messagingSenderId: "746518709157",
   appId: "1:746518709157:web:567a1388d92c6d5bd6de4c"
 };
-
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
-
 let currentDrawId = null;
 let currentEntries = [];
 let selectedWinner = null;
@@ -359,8 +345,7 @@ function signInWithGoogle() {
   const provider = new firebase.auth.GoogleAuthProvider();
   provider.setCustomParameters({ login_hint: ADMIN_EMAIL });
   auth.signInWithPopup(provider).then(result => {
-    const email = result.user.email;
-    if (email !== ADMIN_EMAIL) {
+    if (result.user.email !== ADMIN_EMAIL) {
       auth.signOut();
       document.getElementById('loginError').style.display = 'block';
     }
@@ -369,10 +354,7 @@ function signInWithGoogle() {
     document.getElementById('loginError').textContent = '❌ Login failed: ' + err.message;
   });
 }
-
-function signOut() {
-  auth.signOut();
-}
+function signOut() { auth.signOut(); }
 
 auth.onAuthStateChanged(user => {
   if (user && user.email === ADMIN_EMAIL) {
@@ -393,24 +375,22 @@ async function loadDashboard() {
     const usersSnap = await db.collection('users').get();
     const draws = drawsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     const active = draws.filter(d => d.status === 'active').length;
-
     document.getElementById('totalDraws').textContent = draws.length;
     document.getElementById('activeDraws').textContent = active;
     document.getElementById('totalUsers').textContent = usersSnap.size;
-
     renderDraws(draws);
+    loadPendingReferrals();
   } catch(e) {
-    document.getElementById('drawsList').innerHTML = '<div class="loading">Error loading draws. Check Firestore rules.</div>';
+    document.getElementById('drawsList').innerHTML = '<div class="loading">Error loading. Check Firestore rules.</div>';
   }
 }
 
 function renderDraws(draws) {
   if (!draws.length) {
-    document.getElementById('drawsList').innerHTML = '<div class="loading">Koi draw nahi mila. Upar se new draw banao!</div>';
+    document.getElementById('drawsList').innerHTML = '<div class="loading">Koi draw nahi mila.</div>';
     return;
   }
   draws.sort((a,b) => {
-    // Active draws first, then by date newest first
     if (a.status === 'active' && b.status !== 'active') return -1;
     if (a.status !== 'active' && b.status === 'active') return 1;
     const aDate = a.createdAt ? a.createdAt.seconds : 0;
@@ -423,16 +403,17 @@ function renderDraws(draws) {
 function buildDrawCard(draw) {
   const isActive = draw.status === 'active';
   const isCompleted = draw.status === 'completed';
+  const isPending = draw.pendingCompletion === true;
   const dateStr = draw.drawDate ? new Date(draw.drawDate.seconds * 1000).toLocaleString('en-PK') : 'Target based';
   const isPassed = draw.drawDate && new Date(draw.drawDate.seconds * 1000) < new Date();
-  const dateClass = isPassed && isActive ? 'date-passed' : 'date-ok';
-  const dateNote = isPassed && isActive ? '⚠️ Date guzar gayi — winner select karo!' : dateStr;
+  const dateClass = isPassed && isActive && !isPending ? 'date-passed' : 'date-ok';
+  const dateNote = isPassed && isActive && !isPending ? '⚠️ Date guzar gayi — winner select karo!' : dateStr;
 
-  const winnerBox = isCompleted && draw.winnerName ? `
-    <div class="winner-box">
-      <div class="winner-box-title">🏆 WINNER</div>
+  const winnerBox = (isCompleted || isPending) && draw.winnerName ? `
+    <div class="winner-box" style="${isPending ? 'background:rgba(155,89,182,0.1);border-color:rgba(155,89,182,0.4);' : ''}">
+      <div class="winner-box-title" style="${isPending ? 'color:#9B59B6;' : ''}">${isPending ? '⏳ WINNER SELECTED — Live Draw Pending' : '🏆 WINNER'}</div>
       <div class="winner-name">${draw.winnerName}</div>
-      <div class="winner-detail">${draw.winnerCity || ''} • Draw completed</div>
+      <div class="winner-detail">${draw.winnerEmail || ''}</div>
     </div>` : '';
 
   return `
@@ -446,31 +427,22 @@ function buildDrawCard(draw) {
           <div class="${dateClass}">${dateNote}</div>
         </div>
         <span class="status-badge ${isActive ? 'status-active' : 'status-completed'}">
-          ${isActive ? '🟢 Active' : '✅ Completed'}
+          ${isPending ? '⏳ Pending' : isActive ? '🟢 Active' : '✅ Completed'}
         </span>
       </div>
       <div class="draw-stats">
-        <div class="draw-stat">
-          <div class="draw-stat-num">${draw.currentEntries || 0}</div>
-          <div class="draw-stat-label">Total Entries</div>
-        </div>
-        <div class="draw-stat">
-          <div class="draw-stat-num">${draw.ticketCost || 15}</div>
-          <div class="draw-stat-label">Ticket Cost</div>
-        </div>
-        <div class="draw-stat">
-          <div class="draw-stat-num">${draw.isTargetBased ? draw.targetPlayers : 'Date'}</div>
-          <div class="draw-stat-label">${draw.isTargetBased ? 'Target' : 'Based'}</div>
-        </div>
+        <div class="draw-stat"><div class="draw-stat-num">${draw.currentEntries || 0}</div><div class="draw-stat-label">Entries</div></div>
+        <div class="draw-stat"><div class="draw-stat-num">${draw.ticketCost || 15}</div><div class="draw-stat-label">1st Cost</div></div>
+        <div class="draw-stat"><div class="draw-stat-num">${draw.isTargetBased ? draw.targetPlayers : 'Date'}</div><div class="draw-stat-label">${draw.isTargetBased ? 'Target' : 'Based'}</div></div>
       </div>
       ${winnerBox}
       <div class="draw-actions">
-        <button class="btn btn-entries" onclick="viewEntries('${draw.id}', '${draw.prizeName}')">👥 Entries Dekho</button>
+        <button class="btn btn-entries" onclick="viewEntries('${draw.id}', '${draw.prizeName}')">👥 Entries</button>
         <button class="btn" style="background:rgba(52,152,219,0.2);color:#3498DB;border:1px solid rgba(52,152,219,0.4);" onclick='showEditDrawModal(${JSON.stringify(draw)})'>✏️ Edit</button>
-        ${isActive ? `<button class="btn btn-winner" onclick="selectWinner('${draw.id}')">🏆 Winner Chuno</button>` : ''}
-        ${draw.winnerName && draw.pendingCompletion ? `<button class="btn" style="background:rgba(155,89,182,0.3);color:#9B59B6;border:1px solid rgba(155,89,182,0.5);" onclick="startLiveDraw('${draw.id}', '${draw.prizeName}', '${draw.prizeEmoji}', '${draw.winnerName}')">🎬 Live Draw Chalao</button>` : ''}
-        ${isCompleted && draw.winnerName && !draw.pendingCompletion ? `<button class="btn" style="background:rgba(155,89,182,0.3);color:#9B59B6;border:1px solid rgba(155,89,182,0.5);" onclick="startLiveDraw('${draw.id}', '${draw.prizeName}', '${draw.prizeEmoji}', '${draw.winnerName}')">🎬 Live Draw Chalao</button>` : ''}
-        ${isActive ? `<button class="btn" style="background:${draw.isFeatured ? 'rgba(240,165,0,0.3)' : 'rgba(255,255,255,0.1)'}; color:${draw.isFeatured ? '#F0A500' : '#fff'}; border:1px solid ${draw.isFeatured ? '#F0A500' : 'rgba(255,255,255,0.2)'};" onclick="toggleFeatured('${draw.id}', ${draw.isFeatured})">${draw.isFeatured ? '⭐ Featured' : '☆ Feature Karo'}</button>` : ''}
+        ${isActive && !isPending ? `<button class="btn btn-winner" onclick="selectWinner('${draw.id}')">🏆 Winner Chuno</button>` : ''}
+        ${isPending ? `<button class="btn" style="background:rgba(155,89,182,0.3);color:#9B59B6;border:1px solid rgba(155,89,182,0.5);" onclick="startLiveDraw('${draw.id}', '${draw.prizeName}', '${draw.prizeEmoji || '🎁'}', '${draw.winnerName}')">🎬 Live Draw Chalao</button>` : ''}
+        ${isCompleted && draw.winnerName ? `<button class="btn" style="background:rgba(155,89,182,0.3);color:#9B59B6;border:1px solid rgba(155,89,182,0.5);" onclick="startLiveDraw('${draw.id}', '${draw.prizeName}', '${draw.prizeEmoji || '🎁'}', '${draw.winnerName}')">🎬 Live Draw Chalao</button>` : ''}
+        ${isActive && !isPending ? `<button class="btn" style="background:${draw.isFeatured ? 'rgba(240,165,0,0.3)' : 'rgba(255,255,255,0.1)'}; color:${draw.isFeatured ? '#F0A500' : '#fff'}; border:1px solid ${draw.isFeatured ? '#F0A500' : 'rgba(255,255,255,0.2)'};" onclick="toggleFeatured('${draw.id}', ${draw.isFeatured})">${draw.isFeatured ? '⭐ Featured' : '☆ Feature Karo'}</button>` : ''}
         <button class="btn btn-delete" onclick="deleteDraw('${draw.id}', '${draw.prizeName}')">🗑️ Delete</button>
       </div>
     </div>`;
@@ -479,38 +451,25 @@ function buildDrawCard(draw) {
 // ── View Entries ──────────────────────────────────────────────────────────────
 async function viewEntries(drawId, drawName) {
   document.getElementById('entriesModalTitle').textContent = '👥 ' + drawName + ' — Entries';
-  document.getElementById('entriesList').innerHTML = '<div class="loading">Loading entries...</div>';
+  document.getElementById('entriesList').innerHTML = '<div class="loading">Loading...</div>';
   document.getElementById('entriesModal').classList.add('show');
-
   try {
     const snap = await db.collection('entries').where('drawId', '==', drawId).get();
-    if (snap.empty) {
-      document.getElementById('entriesList').innerHTML = '<div class="loading">Koi entry nahi mili abhi tak.</div>';
+    if (snap.docs.length === 0) {
+      document.getElementById('entriesList').innerHTML = '<div class="loading">Koi entry nahi mili.</div>';
       return;
     }
     const userIds = [...new Set(snap.docs.map(d => d.data().userId))];
     const userMap = {};
     for (const uid of userIds) {
-      try {
-        const uDoc = await db.collection('users').doc(uid).get();
-        if (uDoc.exists) userMap[uid] = uDoc.data();
-      } catch(e) {}
+      try { const uDoc = await db.collection('users').doc(uid).get(); if (uDoc.exists) userMap[uid] = uDoc.data(); } catch(e) {}
     }
-    const html = snap.docs.map(doc => {
+    document.getElementById('entriesList').innerHTML = snap.docs.map(doc => {
       const e = doc.data();
       const user = userMap[e.userId] || {};
-      const name = user.name || 'Unknown User';
       const ts = e.timestamp ? new Date(e.timestamp.seconds * 1000).toLocaleString('en-PK') : '';
-      return `
-        <div class="entry-item">
-          <div>
-            <div class="entry-user">${name}</div>
-            <div class="entry-detail">Entry #${e.entryNumber || '?'} • ${ts}</div>
-          </div>
-          <div class="entry-tickets">${e.ticketsSpent || 0} tickets</div>
-        </div>`;
+      return `<div class="entry-item"><div><div class="entry-user">${user.name || 'Unknown'}</div><div class="entry-detail">Entry #${e.entryNumber || '?'} • ${ts}</div></div><div class="entry-tickets">${e.ticketsSpent || 0} tickets</div></div>`;
     }).join('');
-    document.getElementById('entriesList').innerHTML = html;
   } catch(e) {
     document.getElementById('entriesList').innerHTML = '<div class="loading">Error: ' + e.message + '</div>';
   }
@@ -521,38 +480,28 @@ async function selectWinner(drawId) {
   currentDrawId = drawId;
   currentEntries = [];
   showToast('Entries load ho rahi hain...', false);
-
   try {
     const snap = await db.collection('entries').where('drawId', '==', drawId).get();
-    if (snap.empty) { showToast('❌ Koi entry nahi hai is draw mein!', true); return; }
-
+    if (snap.docs.length === 0) { showToast('❌ Koi entry nahi!', true); return; }
     const userIds = snap.docs.map(d => d.data().userId);
     const userMap = {};
     for (const uid of [...new Set(userIds)]) {
-      try {
-        const uDoc = await db.collection('users').doc(uid).get();
-        if (uDoc.exists) userMap[uid] = uDoc.data();
-      } catch(e) {}
+      try { const uDoc = await db.collection('users').doc(uid).get(); if (uDoc.exists) userMap[uid] = uDoc.data(); } catch(e) {}
     }
     currentEntries = snap.docs.map(d => {
       const data = d.data();
       const user = userMap[data.userId] || {};
-      return { userId: data.userId, name: user.name || 'Unknown', email: user.email || '', phone: user.phone || '' };
+      return { userId: data.userId, name: user.name || 'Unknown', email: user.email || '' };
     });
     pickRandomAndShow();
-  } catch(e) {
-    showToast('❌ Error: ' + e.message, true);
-  }
+  } catch(e) { showToast('❌ Error: ' + e.message, true); }
 }
 
 function pickRandomAndShow() {
   if (!currentEntries.length) return;
-  const idx = Math.floor(Math.random() * currentEntries.length);
-  selectedWinner = currentEntries[idx];
+  selectedWinner = currentEntries[Math.floor(Math.random() * currentEntries.length)];
   document.getElementById('winnerName').textContent = selectedWinner.name;
-  document.getElementById('winnerDetail').textContent = 
-    (selectedWinner.email || selectedWinner.phone || selectedWinner.userId) + 
-    ' • ' + currentEntries.length + ' entries mein se chuna gaya';
+  document.getElementById('winnerDetail').textContent = (selectedWinner.email || selectedWinner.userId) + ' • ' + currentEntries.length + ' entries mein se chuna gaya';
   document.getElementById('winnerModal').classList.add('show');
 }
 
@@ -562,7 +511,6 @@ async function confirmWinner() {
   if (!selectedWinner || !currentDrawId) return;
   closeModal('winnerModal');
   showToast('Winner save ho raha hai...', false);
-
   try {
     await db.collection('draws').doc(currentDrawId).update({
       status: 'active',
@@ -582,38 +530,26 @@ async function confirmWinner() {
     await db.collection('users').doc(selectedWinner.userId).update({
       totalWins: firebase.firestore.FieldValue.increment(1),
     });
-    showToast('🏆 Winner confirm ho gaya! ' + selectedWinner.name, false);
-    
-    // Save winner notification
     await db.collection('notifications').add({
       userId: selectedWinner.userId,
       title: '🏆 Mubarak Ho! Aap Ne Jeeta!',
       body: 'Aap ne draw jeeta! Admin 48 ghante mein aapse rabta karega.',
-      type: 'winner',
-      sent: false,
+      type: 'winner', sent: false,
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
     });
-
-    // Save loser notifications via topic
     await db.collection('broadcast_notifications').add({
       title: '🎁 Naya Draw Result!',
       body: 'Is baar kismat ne saath nahi diya! Agli baar zaroor jeetenge. Try karte raho! 💪',
-      topic: 'all_users',
-      type: 'draw_result',
-      sent: false,
+      topic: 'all_users', type: 'draw_result', sent: false,
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
     });
-
+    showToast('🏆 Winner confirm! Ab Live Draw Chalao button dekhein.', false);
     setTimeout(() => loadDashboard(), 1500);
-  } catch(e) {
-    showToast('❌ Error saving winner: ' + e.message, true);
-  }
+  } catch(e) { showToast('❌ Error: ' + e.message, true); }
 }
 
 // ── Add Draw ──────────────────────────────────────────────────────────────────
-function showAddDrawModal() {
-  document.getElementById('addDrawModal').classList.add('show');
-}
+function showAddDrawModal() { document.getElementById('addDrawModal').classList.add('show'); }
 
 function toggleDrawType() {
   const type = document.getElementById('newDrawType').value;
@@ -627,23 +563,18 @@ async function createDraw() {
   const prizeDesc = document.getElementById('newPrizeDesc').value.trim();
   const prizeValue = parseInt(document.getElementById('newPrizeValue').value) || 0;
   const ticketCost = parseInt(document.getElementById('newTicketCost').value) || 15;
-  const drawType = document.getElementById('newDrawType').value;
-  const isTargetBased = drawType === 'target';
-
-  if (!prizeName) { showToast('❌ Prize name daalo!', true); return; }
-
   const ticketCost2 = parseInt(document.getElementById('newTicketCost2').value) || 25;
   const ticketCost3 = parseInt(document.getElementById('newTicketCost3').value) || 40;
   const ticketCost4 = parseInt(document.getElementById('newTicketCost4').value) || 60;
-
+  const drawType = document.getElementById('newDrawType').value;
+  const isTargetBased = drawType === 'target';
+  if (!prizeName) { showToast('❌ Prize name daalo!', true); return; }
   const data = {
     prizeName, prizeEmoji, prizeDescription: prizeDesc,
     prizeValue, ticketCost, ticketCost2, ticketCost3, ticketCost4,
-    isTargetBased,
-    status: 'active', currentEntries: 0, isFeatured: false,
+    isTargetBased, status: 'active', currentEntries: 0, isFeatured: false,
     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
   };
-
   if (isTargetBased) {
     data.targetPlayers = parseInt(document.getElementById('newTargetPlayers').value) || 100;
     data.drawDate = null;
@@ -653,31 +584,22 @@ async function createDraw() {
     data.drawDate = firebase.firestore.Timestamp.fromDate(new Date(dateVal));
     data.targetPlayers = 0;
   }
-
   try {
     await db.collection('draws').add(data);
     closeModal('addDrawModal');
     showToast('✅ Naya draw ban gaya!', false);
-
-    // Notify all users about new draw
     await db.collection('broadcast_notifications').add({
       title: '🎉 Naya Draw Available!',
       body: `${data.prizeName} — Ab enter karo aur jeetnay ka mauka pao!`,
-      topic: 'new_draws',
-      type: 'new_draw',
-      sent: false,
+      topic: 'new_draws', type: 'new_draw', sent: false,
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
     });
-
     setTimeout(() => loadDashboard(), 1000);
-  } catch(e) {
-    showToast('❌ Error: ' + e.message, true);
-  }
+  } catch(e) { showToast('❌ Error: ' + e.message, true); }
 }
 
 // ── Edit Draw ─────────────────────────────────────────────────────────────────
 let editingDrawId = null;
-
 function showEditDrawModal(draw) {
   editingDrawId = draw.id;
   document.getElementById('editEmoji').value = draw.prizeEmoji || '🎁';
@@ -685,14 +607,15 @@ function showEditDrawModal(draw) {
   document.getElementById('editPrizeDesc').value = draw.prizeDescription || '';
   document.getElementById('editPrizeValue').value = draw.prizeValue || 0;
   document.getElementById('editTicketCost').value = draw.ticketCost || 15;
+  document.getElementById('editTicketCost2').value = draw.ticketCost2 || 25;
+  document.getElementById('editTicketCost3').value = draw.ticketCost3 || 40;
+  document.getElementById('editTicketCost4').value = draw.ticketCost4 || 60;
   document.getElementById('editStatus').value = draw.status || 'active';
   document.getElementById('editFeatured').value = draw.isFeatured ? 'true' : 'false';
-
   const isTarget = draw.isTargetBased;
   document.getElementById('editDrawType').value = isTarget ? 'target' : 'date';
   document.getElementById('editTargetPlayersGroup').style.display = isTarget ? 'block' : 'none';
   document.getElementById('editDrawDateGroup').style.display = isTarget ? 'none' : 'block';
-
   if (isTarget) {
     document.getElementById('editTargetPlayers').value = draw.targetPlayers || 0;
   } else if (draw.drawDate) {
@@ -700,7 +623,6 @@ function showEditDrawModal(draw) {
     const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
     document.getElementById('editDrawDate').value = local.toISOString().slice(0, 16);
   }
-
   document.getElementById('editDrawModal').classList.add('show');
 }
 
@@ -712,121 +634,141 @@ function toggleEditDrawType() {
 
 async function saveEditDraw() {
   if (!editingDrawId) return;
-
   const drawType = document.getElementById('editDrawType').value;
   const isTargetBased = drawType === 'target';
-
   const data = {
     prizeEmoji: document.getElementById('editEmoji').value.trim(),
     prizeName: document.getElementById('editPrizeName').value.trim(),
     prizeDescription: document.getElementById('editPrizeDesc').value.trim(),
     prizeValue: parseInt(document.getElementById('editPrizeValue').value) || 0,
     ticketCost: parseInt(document.getElementById('editTicketCost').value) || 15,
+    ticketCost2: parseInt(document.getElementById('editTicketCost2').value) || 25,
+    ticketCost3: parseInt(document.getElementById('editTicketCost3').value) || 40,
+    ticketCost4: parseInt(document.getElementById('editTicketCost4').value) || 60,
     status: document.getElementById('editStatus').value,
     isFeatured: document.getElementById('editFeatured').value === 'true',
     isTargetBased: isTargetBased,
   };
-
   if (isTargetBased) {
     data.targetPlayers = parseInt(document.getElementById('editTargetPlayers').value) || 0;
     data.drawDate = null;
   } else {
     const dateVal = document.getElementById('editDrawDate').value;
-    if (dateVal) {
-      data.drawDate = firebase.firestore.Timestamp.fromDate(new Date(dateVal));
-    }
+    if (dateVal) data.drawDate = firebase.firestore.Timestamp.fromDate(new Date(dateVal));
     data.targetPlayers = 0;
   }
-
   try {
     await db.collection('draws').doc(editingDrawId).update(data);
     closeModal('editDrawModal');
     showToast('✅ Draw update ho gaya!', false);
     setTimeout(() => loadDashboard(), 800);
-  } catch(e) {
-    showToast('❌ Error: ' + e.message, true);
-  }
+  } catch(e) { showToast('❌ Error: ' + e.message, true); }
 }
 
 // ── Live Draw ─────────────────────────────────────────────────────────────────
 async function startLiveDraw(drawId, prizeName, prizeEmoji, winnerName) {
-  if (!confirm(`Live Draw shuru karein? Sabke phones pe automatically khulega!\n\nPrize: ${prizeName}\nWinner: ${winnerName}`)) return;
-  
+  if (!confirm(`Live Draw shuru karein?\n\nPrize: ${prizeName}\nWinner: ${winnerName}`)) return;
   try {
-    // Delete any existing live draws first
     const existing = await db.collection('live_draws').where('status', '==', 'active').get();
-    for (const doc of existing.docs) {
-      await db.collection('live_draws').doc(doc.id).delete();
-    }
-
-    // Create new live draw
+    for (const doc of existing.docs) await db.collection('live_draws').doc(doc.id).delete();
     await db.collection('live_draws').doc(drawId).set({
-      drawId: drawId,
-      prizeName: prizeName,
-      prizeEmoji: prizeEmoji,
-      winnerName: winnerName,
+      drawId, prizeName, prizeEmoji, winnerName,
       status: 'active',
       startedAt: firebase.firestore.FieldValue.serverTimestamp(),
     });
+    showToast('🎬 Live Draw shuru ho gaya!', false);
+  } catch(e) { showToast('❌ Error: ' + e.message, true); }
+}
 
-    showToast('🎬 Live Draw shuru ho gaya! Sabke phones pe khul raha hai!', false);
+// ── Pending Referrals ─────────────────────────────────────────────────────────
+async function loadPendingReferrals() {
+  document.getElementById('pendingReferralsList').innerHTML = '<div class="loading">Loading...</div>';
+  try {
+    const snap = await db.collection('pending_referrals').where('status', '==', 'pending').get();
+    if (snap.docs.length === 0) {
+      document.getElementById('pendingReferralsList').innerHTML = '<div class="loading">✅ Koi pending referral nahi!</div>';
+      return;
+    }
+    const userMap = {};
+    for (const doc of snap.docs) {
+      const data = doc.data();
+      if (!userMap[data.referrerId]) {
+        try { const uDoc = await db.collection('users').doc(data.referrerId).get(); if (uDoc.exists) userMap[data.referrerId] = uDoc.data(); } catch(e) {}
+      }
+    }
+    document.getElementById('pendingReferralsList').innerHTML = snap.docs.map(doc => {
+      const r = doc.data();
+      const referrer = userMap[r.referrerId] || {};
+      const ts = r.createdAt ? new Date(r.createdAt.seconds * 1000).toLocaleString('en-PK') : '';
+      return `<div class="draw-card" style="margin-bottom:10px;"><div style="display:flex;justify-content:space-between;align-items:center;"><div><div style="font-size:15px;font-weight:bold;color:white;">${referrer.name || 'Unknown'}</div><div style="font-size:12px;color:#9E9E9E;">${referrer.email || ''} • ${ts}</div><div style="font-size:12px;color:#F5C518;margin-top:4px;">Code: ${r.referrerCode} • +${r.ticketsForReferrer} tickets pending</div></div><button class="btn" style="background:#27AE60;color:white;" onclick="awardReferralTickets('${doc.id}', '${r.referrerId}', ${r.ticketsForReferrer}, '${referrer.name || 'User'}')">✅ Award</button></div></div>`;
+    }).join('');
   } catch(e) {
-    showToast('❌ Error: ' + e.message, true);
+    document.getElementById('pendingReferralsList').innerHTML = '<div class="loading">Error: ' + e.message + '</div>';
   }
 }
-// ── Delete Draw ───────────────────────────────────────────────────────────────
+
+async function awardReferralTickets(refDocId, referrerId, tickets, name) {
+  if (!confirm(`${name} ko +${tickets} tickets dena chahte hain?`)) return;
+  try {
+    await db.collection('users').doc(referrerId).update({
+      'tickets': firebase.firestore.FieldValue.increment(tickets),
+      'totalReferrals': firebase.firestore.FieldValue.increment(1),
+      'ticketsFromReferrals': firebase.firestore.FieldValue.increment(tickets),
+    });
+    await db.collection('tickets_log').add({
+      'userId': referrerId, 'amount': tickets, 'type': 'credit',
+      'reason': 'Referral reward — admin approved',
+      'timestamp': firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    await db.collection('pending_referrals').doc(refDocId).update({
+      'status': 'awarded',
+      'awardedAt': firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    showToast('✅ ' + tickets + ' tickets ' + name + ' ko mil gaye!', false);
+    loadPendingReferrals();
+  } catch(e) { showToast('❌ Error: ' + e.message, true); }
+}
+
+// ── Featured ──────────────────────────────────────────────────────────────────
 async function toggleFeatured(drawId, currentFeatured) {
   try {
-    await db.collection('draws').doc(drawId).update({
-      isFeatured: !currentFeatured,
-    });
+    await db.collection('draws').doc(drawId).update({ isFeatured: !currentFeatured });
     showToast(currentFeatured ? '☆ Featured hata diya' : '⭐ Featured kar diya!', false);
     setTimeout(() => loadDashboard(), 800);
-  } catch(e) {
-    showToast('❌ Error: ' + e.message, true);
-  }
+  } catch(e) { showToast('❌ Error: ' + e.message, true); }
 }
 
+// ── Delete Draw ───────────────────────────────────────────────────────────────
 async function deleteDraw(drawId, name) {
-  if (!confirm('Kya aap "' + name + '" delete karna chahte hain? Yeh wapis nahi aayega!')) return;
+  if (!confirm('Kya aap "' + name + '" delete karna chahte hain?')) return;
   try {
-    // Check if draw has winner — save to winners collection first
     const drawDoc = await db.collection('draws').doc(drawId).get();
     const drawData = drawDoc.data();
     if (drawData && drawData.winnerName) {
       await db.collection('archived_winners').add({
-        drawId: drawId,
-        prizeName: drawData.prizeName,
-        prizeEmoji: drawData.prizeEmoji,
-        prizeValue: drawData.prizeValue,
-        winnerName: drawData.winnerName,
-        winnerEmail: drawData.winnerEmail || '',
-        winnerCity: drawData.winnerCity || '',
-        drawDate: drawData.drawDate,
-        completedAt: drawData.completedAt,
+        drawId, prizeName: drawData.prizeName, prizeEmoji: drawData.prizeEmoji,
+        prizeValue: drawData.prizeValue, winnerName: drawData.winnerName,
+        winnerEmail: drawData.winnerEmail || '', winnerCity: drawData.winnerCity || '',
+        drawDate: drawData.drawDate, completedAt: drawData.completedAt,
         archivedAt: firebase.firestore.FieldValue.serverTimestamp(),
       });
     }
     await db.collection('draws').doc(drawId).delete();
     showToast('🗑️ Draw delete ho gaya', false);
     setTimeout(() => loadDashboard(), 800);
-  } catch(e) {
-    showToast('❌ Error: ' + e.message, true);
-  }
+  } catch(e) { showToast('❌ Error: ' + e.message, true); }
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function closeModal(id) { document.getElementById(id).classList.remove('show'); }
-
 function showToast(msg, isError) {
   const t = document.getElementById('toast');
   t.textContent = msg;
   t.className = 'toast show' + (isError ? ' error' : '');
   setTimeout(() => t.className = 'toast', 3000);
 }
-
 window.onclick = function(e) {
-  ['entriesModal','addDrawModal','winnerModal'].forEach(id => {
+  ['entriesModal','addDrawModal','winnerModal','editDrawModal'].forEach(id => {
     const el = document.getElementById(id);
     if (e.target === el) el.classList.remove('show');
   });
