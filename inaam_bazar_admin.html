@@ -671,7 +671,7 @@ async function startLiveDraw(drawId, prizeName, prizeEmoji, winnerName) {
   try {
     const existing = await db.collection('live_draws').where('status', '==', 'active').get();
     for (const doc of existing.docs) await db.collection('live_draws').doc(doc.id).delete();
-    await db.collection('live_draws').doc(drawId).set({
+    await db.collection('live_draws').add({
       drawId, prizeName, prizeEmoji, winnerName,
       status: 'active',
       startedAt: firebase.firestore.FieldValue.serverTimestamp(),
