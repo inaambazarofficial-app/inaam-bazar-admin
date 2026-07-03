@@ -128,11 +128,14 @@
       <div class="stat-card"><div class="stat-num" id="totalUsers">-</div><div class="stat-label">Total Users</div></div>
     </div>
 
-    <div class="section-title">
-      🎁 Pending Referral Rewards
-      <button class="add-draw-btn" style="background:#8E44AD;" onclick="loadPendingReferrals()">🔄 Refresh</button>
+    <div class="section-title" onclick="togglePendingSection()" style="cursor:pointer;">
+      🎁 Pending Referral Rewards <span id="pendingCount" style="background:#8E44AD;padding:2px 8px;border-radius:10px;font-size:11px;margin-left:6px;">0</span>
+      <span style="display:flex;gap:8px;">
+        <button class="add-draw-btn" style="background:#8E44AD;" onclick="event.stopPropagation(); loadPendingReferrals()">🔄</button>
+        <span id="pendingToggleIcon" style="font-size:14px;">▼</span>
+      </span>
     </div>
-    <div id="pendingReferralsList"><div class="loading">Loading...</div></div>
+    <div id="pendingReferralsList" style="display:none;"><div class="loading">Loading...</div></div>
 
     <div class="section-title" style="margin-top:24px;">
       🎯 Draws Management
@@ -379,7 +382,7 @@ async function loadDashboard() {
     document.getElementById('activeDraws').textContent = active;
     document.getElementById('totalUsers').textContent = usersSnap.size;
     renderDraws(draws);
-    loadPendingReferrals();
+    loadPendingReferrals(); // loads count only unless expanded
   } catch(e) {
     document.getElementById('drawsList').innerHTML = '<div class="loading">Error loading. Check Firestore rules.</div>';
   }
@@ -681,10 +684,24 @@ async function startLiveDraw(drawId, prizeName, prizeEmoji, winnerName) {
 }
 
 // ── Pending Referrals ─────────────────────────────────────────────────────────
+let pendingSectionOpen = false;
+
+function togglePendingSection() {
+  pendingSectionOpen = !pendingSectionOpen;
+  document.getElementById('pendingReferralsList').style.display = pendingSectionOpen ? 'block' : 'none';
+  document.getElementById('pendingToggleIcon').textContent = pendingSectionOpen ? '▲' : '▼';
+  if (pendingSectionOpen) loadPendingReferrals();
+}
+
 async function loadPendingReferrals() {
-  document.getElementById('pendingReferralsList').innerHTML = '<div class="loading">Loading...</div>';
   try {
     const snap = await db.collection('pending_referrals').where('status', '==', 'pending').get();
+    document.getElementById('pendingCount').textContent = snap.docs.length;
+
+    if (!pendingSectionOpen) return;
+
+    document.getElementById('pendingReferralsList').innerHTML = '<div class="loading">Loading...</div>';
+
     if (snap.docs.length === 0) {
       document.getElementById('pendingReferralsList').innerHTML = '<div class="loading">✅ Koi pending referral nahi!</div>';
       return;
@@ -696,12 +713,21 @@ async function loadPendingReferrals() {
         try { const uDoc = await db.collection('users').doc(data.referrerId).get(); if (uDoc.exists) userMap[data.referrerId] = uDoc.data(); } catch(e) {}
       }
     }
-    document.getElementById('pendingReferralsList').innerHTML = snap.docs.map(doc => {
-      const r = doc.data();
-      const referrer = userMap[r.referrerId] || {};
-      const ts = r.createdAt ? new Date(r.createdAt.seconds * 1000).toLocaleString('en-PK') : '';
-      return `<div class="draw-card" style="margin-bottom:10px;"><div style="display:flex;justify-content:space-between;align-items:center;"><div><div style="font-size:15px;font-weight:bold;color:white;">${referrer.name || 'Unknown'}</div><div style="font-size:12px;color:#9E9E9E;">${referrer.email || ''} • ${ts}</div><div style="font-size:12px;color:#F5C518;margin-top:4px;">Code: ${r.referrerCode} • +${r.ticketsForReferrer} tickets pending</div></div><button class="btn" style="background:#27AE60;color:white;" onclick="awardReferralTickets('${doc.id}', '${r.referrerId}', ${r.ticketsForReferrer}, '${referrer.name || 'User'}')">✅ Award</button></div></div>`;
-    }).join('');
+    document.getElementById('pendingReferralsList').innerHTML = `
+      <div style="max-height:300px;overflow-y:auto;border:1px solid rgba(240,165,0,0.2);border-radius:8px;">
+        ${snap.docs.map(doc => {
+          const r = doc.data();
+          const referrer = userMap[r.referrerId] || {};
+          const ts = r.createdAt ? new Date(r.createdAt.seconds * 1000).toLocaleDateString('en-PK') : '';
+          return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.05);">
+            <div style="flex:1;min-width:0;">
+              <span style="font-size:13px;font-weight:bold;color:white;">${referrer.name || 'Unknown'}</span>
+              <span style="font-size:11px;color:#9E9E9E;"> • ${ts} • Code: ${r.referrerCode} • +${r.ticketsForReferrer}🎟️</span>
+            </div>
+            <button class="btn" style="background:#27AE60;color:white;padding:5px 10px;font-size:12px;flex-shrink:0;" onclick="awardReferralTickets('${doc.id}', '${r.referrerId}', ${r.ticketsForReferrer}, '${referrer.name || 'User'}')">✅ Award</button>
+          </div>`;
+        }).join('')}
+      </div>`;
   } catch(e) {
     document.getElementById('pendingReferralsList').innerHTML = '<div class="loading">Error: ' + e.message + '</div>';
   }
