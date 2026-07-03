@@ -90,6 +90,10 @@
   .date-passed { color: #E74C3C; font-size: 12px; margin-top: 2px; }
   .date-ok { color: #27AE60; font-size: 12px; margin-top: 2px; }
   .pending-box { background: rgba(155,89,182,0.1); border: 1px solid rgba(155,89,182,0.4); border-radius: 8px; padding: 14px; margin-top: 12px; }
+  .filter-tab { background: rgba(255,255,255,0.05); color: #9E9E9E; border: 1px solid rgba(255,255,255,0.1); padding: 6px 14px; border-radius: 20px; font-size: 12px; cursor: pointer; font-weight: bold; }
+  .filter-tab.active { background: rgba(240,165,0,0.2); color: #F0A500; border-color: #F0A500; }
+  .draw-compact { background: #16213E; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
+  .draw-compact:hover { border-color: rgba(240,165,0,0.3); }
 </style>
 </head>
 <body>
@@ -144,7 +148,17 @@
       🎯 Draws Management
       <button class="add-draw-btn" onclick="showAddDrawModal()">+ New Draw</button>
     </div>
+    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
+      <button class="filter-tab active" id="filterAll" onclick="setDrawFilter('all')">Sab</button>
+      <button class="filter-tab" id="filterActive" onclick="setDrawFilter('active')">🟢 Active</button>
+      <button class="filter-tab" id="filterPending" onclick="setDrawFilter('pending')">⏳ Pending</button>
+      <button class="filter-tab" id="filterCompleted" onclick="setDrawFilter('completed')">✅ Completed</button>
+      <input class="form-input" id="drawSearchInput" placeholder="🔍 Prize name search karo..." style="flex:1;min-width:180px;max-width:260px;padding:8px 12px;" oninput="renderDraws(allDrawsCache)">
+    </div>
     <div id="drawsList"><div class="loading">Loading draws...</div></div>
+    <div id="loadMoreWrap" style="text-align:center;margin-top:16px;display:none;">
+      <button class="btn" style="background:rgba(240,165,0,0.15);color:#F0A500;border:1px solid rgba(240,165,0,0.4);" onclick="loadMoreDraws()">⬇️ Aur Dikhao</button>
+    </div>
   </div>
 </div>
 
@@ -391,22 +405,90 @@ async function loadDashboard() {
   }
 }
 
+let allDrawsCache = [];
+let currentFilter = 'all';
+let loadLimit = 10;
+
+function setDrawFilter(filter) {
+  currentFilter = filter;
+  loadLimit = 10;
+  ['All','Active','Pending','Completed'].forEach(f => {
+    document.getElementById('filter' + f).classList.remove('active');
+  });
+  document.getElementById('filter' + filter.charAt(0).toUpperCase() + filter.slice(1)).classList.add('active');
+  renderDraws(allDrawsCache);
+}
+
+function loadMoreDraws() {
+  loadLimit += 10;
+  renderDraws(allDrawsCache);
+}
+
 function renderDraws(draws) {
-  if (!draws.length) {
-    document.getElementById('drawsList').innerHTML = '<div class="loading">Koi draw nahi mila.</div>';
-    return;
-  }
-  draws.sort((a,b) => {
+  allDrawsCache = draws;
+  const searchTerm = (document.getElementById('drawSearchInput')?.value || '').toLowerCase();
+
+  let filtered = draws.filter(d => {
+    const isPending = d.pendingCompletion === true;
+    const isActive = d.status === 'active' && !isPending;
+    const isCompleted = d.status === 'completed';
+    if (currentFilter === 'active' && !isActive) return false;
+    if (currentFilter === 'pending' && !isPending) return false;
+    if (currentFilter === 'completed' && !isCompleted) return false;
+    if (searchTerm && !d.prizeName.toLowerCase().includes(searchTerm)) return false;
+    return true;
+  });
+
+  filtered.sort((a,b) => {
     if (a.status === 'active' && b.status !== 'active') return -1;
     if (a.status !== 'active' && b.status === 'active') return 1;
     const aDate = a.createdAt ? a.createdAt.seconds : 0;
     const bDate = b.createdAt ? b.createdAt.seconds : 0;
     return bDate - aDate;
   });
-  document.getElementById('drawsList').innerHTML = draws.map(draw => buildDrawCard(draw)).join('');
+
+  if (!filtered.length) {
+    document.getElementById('drawsList').innerHTML = '<div class="loading">Koi draw nahi mila.</div>';
+    document.getElementById('loadMoreWrap').style.display = 'none';
+    return;
+  }
+
+  const visible = filtered.slice(0, loadLimit);
+  document.getElementById('drawsList').innerHTML = visible.map(draw => {
+    const isCompleted = draw.status === 'completed';
+    // Completed draws render as compact rows unless expanded
+    if (isCompleted && !expandedDraws.has(draw.id)) {
+      return buildCompactRow(draw);
+    }
+    return buildDrawCard(draw, isCompleted);
+  }).join('');
+
+  document.getElementById('loadMoreWrap').style.display = filtered.length > loadLimit ? 'block' : 'none';
 }
 
-function buildDrawCard(draw) {
+let expandedDraws = new Set();
+function toggleExpand(drawId) {
+  if (expandedDraws.has(drawId)) expandedDraws.delete(drawId);
+  else expandedDraws.add(drawId);
+  renderDraws(allDrawsCache);
+}
+
+function buildCompactRow(draw) {
+  const dateStr = draw.completedAt ? new Date(draw.completedAt.seconds * 1000).toLocaleDateString('en-PK') : '';
+  return `
+    <div class="draw-compact" onclick="toggleExpand('${draw.id}')">
+      <div style="display:flex;align-items:center;gap:10px;min-width:0;">
+        <span style="font-size:20px;">${draw.prizeEmoji || '🎁'}</span>
+        <div style="min-width:0;">
+          <div style="font-size:13px;font-weight:bold;color:white;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${draw.prizeName}</div>
+          <div style="font-size:11px;color:#9E9E9E;">🏆 ${draw.winnerName || '-'} • ${dateStr}</div>
+        </div>
+      </div>
+      <span style="font-size:11px;color:#9E9E9E;flex-shrink:0;">▼ Details</span>
+    </div>`;
+}
+
+function buildDrawCard(draw, showCollapse) {
   const isActive = draw.status === 'active';
   const isCompleted = draw.status === 'completed';
   const isPending = draw.pendingCompletion === true;
@@ -450,6 +532,7 @@ function buildDrawCard(draw) {
         ${isCompleted && draw.winnerName ? `<button class="btn" style="background:rgba(155,89,182,0.3);color:#9B59B6;border:1px solid rgba(155,89,182,0.5);" onclick="startLiveDraw('${draw.id}', '${draw.prizeName}', '${draw.prizeEmoji || '🎁'}', '${draw.winnerName}')">🎬 Live Draw Chalao</button>` : ''}
         ${isActive && !isPending ? `<button class="btn" style="background:${draw.isFeatured ? 'rgba(240,165,0,0.3)' : 'rgba(255,255,255,0.1)'}; color:${draw.isFeatured ? '#F0A500' : '#fff'}; border:1px solid ${draw.isFeatured ? '#F0A500' : 'rgba(255,255,255,0.2)'};" onclick="toggleFeatured('${draw.id}', ${draw.isFeatured})">${draw.isFeatured ? '⭐ Featured' : '☆ Feature Karo'}</button>` : ''}
         <button class="btn btn-delete" onclick="deleteDraw('${draw.id}', '${draw.prizeName}')">🗑️ Delete</button>
+        ${showCollapse ? `<button class="btn" style="background:rgba(255,255,255,0.08);color:#9E9E9E;" onclick="toggleExpand('${draw.id}')">▲ Collapse</button>` : ''}
       </div>
     </div>`;
 }
