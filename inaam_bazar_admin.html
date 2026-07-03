@@ -122,22 +122,25 @@
   </div>
 
   <div class="content">
-    <div class="stats-bar">
-      <div class="stat-card"><div class="stat-num" id="totalDraws">-</div><div class="stat-label">Total Draws</div></div>
-      <div class="stat-card"><div class="stat-num" id="activeDraws">-</div><div class="stat-label">Active Draws</div></div>
-      <div class="stat-card"><div class="stat-num" id="totalUsers">-</div><div class="stat-label">Total Users</div></div>
+    <div style="display:flex;gap:12px;margin-bottom:24px;align-items:stretch;">
+      <div class="stats-bar" style="flex:1;margin-bottom:0;">
+        <div class="stat-card"><div class="stat-num" id="totalDraws">-</div><div class="stat-label">Total Draws</div></div>
+        <div class="stat-card"><div class="stat-num" id="activeDraws">-</div><div class="stat-label">Active Draws</div></div>
+        <div class="stat-card"><div class="stat-num" id="totalUsers">-</div><div class="stat-label">Total Users</div></div>
+      </div>
+      <div style="width:220px;background:#16213E;border:1px solid rgba(142,68,173,0.4);border-radius:12px;padding:12px;flex-shrink:0;">
+        <div onclick="togglePendingSection()" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:13px;font-weight:bold;color:#8E44AD;">🎁 Referrals</span>
+          <span style="display:flex;align-items:center;gap:6px;">
+            <span id="pendingCount" style="background:#8E44AD;padding:2px 7px;border-radius:10px;font-size:11px;color:white;">0</span>
+            <span id="pendingToggleIcon" style="font-size:11px;color:#9E9E9E;">▼</span>
+          </span>
+        </div>
+        <div id="pendingReferralsList" style="display:none;margin-top:8px;"></div>
+      </div>
     </div>
 
-    <div class="section-title" onclick="togglePendingSection()" style="cursor:pointer;">
-      🎁 Pending Referral Rewards <span id="pendingCount" style="background:#8E44AD;padding:2px 8px;border-radius:10px;font-size:11px;margin-left:6px;">0</span>
-      <span style="display:flex;gap:8px;">
-        <button class="add-draw-btn" style="background:#8E44AD;" onclick="event.stopPropagation(); loadPendingReferrals()">🔄</button>
-        <span id="pendingToggleIcon" style="font-size:14px;">▼</span>
-      </span>
-    </div>
-    <div id="pendingReferralsList" style="display:none;"><div class="loading">Loading...</div></div>
-
-    <div class="section-title" style="margin-top:24px;">
+    <div class="section-title">
       🎯 Draws Management
       <button class="add-draw-btn" onclick="showAddDrawModal()">+ New Draw</button>
     </div>
@@ -700,10 +703,10 @@ async function loadPendingReferrals() {
 
     if (!pendingSectionOpen) return;
 
-    document.getElementById('pendingReferralsList').innerHTML = '<div class="loading">Loading...</div>';
+    document.getElementById('pendingReferralsList').innerHTML = '<div class="loading" style="padding:10px;font-size:12px;">Loading...</div>';
 
     if (snap.docs.length === 0) {
-      document.getElementById('pendingReferralsList').innerHTML = '<div class="loading">✅ Koi pending referral nahi!</div>';
+      document.getElementById('pendingReferralsList').innerHTML = '<div class="loading" style="padding:10px;font-size:12px;">✅ Koi pending nahi!</div>';
       return;
     }
     const userMap = {};
@@ -714,23 +717,35 @@ async function loadPendingReferrals() {
       }
     }
     document.getElementById('pendingReferralsList').innerHTML = `
-      <div style="max-height:300px;overflow-y:auto;border:1px solid rgba(240,165,0,0.2);border-radius:8px;">
+      <div style="max-height:280px;overflow-y:auto;">
         ${snap.docs.map(doc => {
           const r = doc.data();
           const referrer = userMap[r.referrerId] || {};
-          const ts = r.createdAt ? new Date(r.createdAt.seconds * 1000).toLocaleDateString('en-PK') : '';
-          return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.05);">
-            <div style="flex:1;min-width:0;">
-              <span style="font-size:13px;font-weight:bold;color:white;">${referrer.name || 'Unknown'}</span>
-              <span style="font-size:11px;color:#9E9E9E;"> • ${ts} • Code: ${r.referrerCode} • +${r.ticketsForReferrer}🎟️</span>
+          return `<div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.08);">
+            <div style="font-size:12px;font-weight:bold;color:white;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${referrer.name || 'Unknown'}</div>
+            <div style="font-size:10px;color:#9E9E9E;margin-bottom:6px;">${r.referrerCode} • +${r.ticketsForReferrer}🎟️</div>
+            <div style="display:flex;gap:4px;">
+              <button style="flex:1;background:#27AE60;color:white;border:none;padding:4px;border-radius:5px;font-size:10px;cursor:pointer;" onclick="awardReferralTickets('${doc.id}', '${r.referrerId}', ${r.ticketsForReferrer}, '${referrer.name || 'User'}')">✅ Award</button>
+              <button style="flex:1;background:rgba(231,76,60,0.2);color:#E74C3C;border:1px solid rgba(231,76,60,0.4);padding:4px;border-radius:5px;font-size:10px;cursor:pointer;" onclick="rejectReferral('${doc.id}', '${referrer.name || 'User'}')">❌ Reject</button>
             </div>
-            <button class="btn" style="background:#27AE60;color:white;padding:5px 10px;font-size:12px;flex-shrink:0;" onclick="awardReferralTickets('${doc.id}', '${r.referrerId}', ${r.ticketsForReferrer}, '${referrer.name || 'User'}')">✅ Award</button>
           </div>`;
         }).join('')}
       </div>`;
   } catch(e) {
-    document.getElementById('pendingReferralsList').innerHTML = '<div class="loading">Error: ' + e.message + '</div>';
+    document.getElementById('pendingReferralsList').innerHTML = '<div class="loading" style="padding:10px;font-size:12px;">Error: ' + e.message + '</div>';
   }
+}
+
+async function rejectReferral(refDocId, name) {
+  if (!confirm(`${name} ka referral reject/delete karna chahte hain?`)) return;
+  try {
+    await db.collection('pending_referrals').doc(refDocId).update({
+      status: 'rejected',
+      rejectedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    showToast('❌ Referral reject ho gaya', false);
+    loadPendingReferrals();
+  } catch(e) { showToast('❌ Error: ' + e.message, true); }
 }
 
 async function awardReferralTickets(refDocId, referrerId, tickets, name) {
