@@ -609,11 +609,15 @@ async function confirmWinner() {
       winnerEmail: selectedWinner.email || '',
       pendingCompletion: true,
     });
+    const drawSnapForWinner = await db.collection('draws').doc(currentDrawId).get();
+    const drawDataForWinner = drawSnapForWinner.data() || {};
     await db.collection('winners').add({
       drawId: currentDrawId,
       userId: selectedWinner.userId,
       winnerName: selectedWinner.name,
       winnerEmail: selectedWinner.email || '',
+      prizeName: drawDataForWinner.prizeName || '',
+      prizeEmoji: drawDataForWinner.prizeEmoji || '🎁',
       timestamp: firebase.firestore.FieldValue.serverTimestamp(),
     });
     await db.collection('users').doc(selectedWinner.userId).update({
