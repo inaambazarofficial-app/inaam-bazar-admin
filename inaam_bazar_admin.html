@@ -144,6 +144,26 @@
       </div>
     </div>
 
+    <div style="background:#16213E;border:1px solid rgba(240,165,0,0.4);border-radius:12px;padding:16px;margin-bottom:24px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <span style="font-size:15px;font-weight:bold;color:#F0A500;">⚡ Happy Hour</span>
+        <span id="happyHourStatus" style="font-size:12px;color:#9E9E9E;">Loading...</span>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        <select class="form-input" id="happyHourMultiplier" style="width:100px;padding:8px;">
+          <option value="2">2x</option>
+          <option value="3">3x</option>
+        </select>
+        <select class="form-input" id="happyHourDuration" style="width:120px;padding:8px;">
+          <option value="30">30 min</option>
+          <option value="60" selected>60 min</option>
+          <option value="90">90 min</option>
+        </select>
+        <button class="btn" style="background:#F0A500;color:#3D1F00;" onclick="startHappyHour()">🚀 Start Happy Hour</button>
+        <button class="btn" style="background:rgba(231,76,60,0.15);color:#E74C3C;border:1px solid rgba(231,76,60,0.4);" onclick="stopHappyHour()">⏹️ Stop Now</button>
+      </div>
+    </div>
+
     <div class="section-title">
       🎯 Draws Management
       <button class="add-draw-btn" onclick="showAddDrawModal()">+ New Draw</button>
@@ -388,6 +408,73 @@ auth.onAuthStateChanged(user => {
   }
 });
 
+// ── Happy Hour ────────────────────────────────────────────────────────────────
+async function startHappyHour() {
+  const multiplier = parseInt(document.getElementById('happyHourMultiplier').value);
+  const durationMin = parseInt(document.getElementById('happyHourDuration').value);
+  const endTime = new Date(Date.now() + durationMin * 60000);
+
+  try {
+    await db.collection('config').doc('happy_hour').set({
+      active: true,
+      multiplier: multiplier,
+      startedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      endsAt: firebase.firestore.Timestamp.fromDate(endTime),
+    });
+
+    // Notify all users
+    await db.collection('broadcast_notifications').add({
+      title: '⚡ Happy Hour Shuru!',
+      body: `${multiplier}x Tickets — agle ${durationMin} minute tak sab kuch double!`,
+      topic: 'all_users',
+      type: 'happy_hour',
+      sent: false,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+
+    showToast(`⚡ Happy Hour shuru! ${multiplier}x for ${durationMin} min`, false);
+    checkHappyHourStatus();
+  } catch(e) {
+    showToast('❌ Error: ' + e.message, true);
+  }
+}
+
+async function stopHappyHour() {
+  try {
+    await db.collection('config').doc('happy_hour').update({
+      active: false,
+    });
+    showToast('⏹️ Happy Hour band kar diya', false);
+    checkHappyHourStatus();
+  } catch(e) {
+    showToast('❌ Error: ' + e.message, true);
+  }
+}
+
+async function checkHappyHourStatus() {
+  try {
+    const doc = await db.collection('config').doc('happy_hour').get();
+    const statusEl = document.getElementById('happyHourStatus');
+    if (!doc.exists || doc.data().active !== true) {
+      statusEl.textContent = '⚫ Band hai';
+      statusEl.style.color = '#9E9E9E';
+      return;
+    }
+    const data = doc.data();
+    const endsAt = data.endsAt ? new Date(data.endsAt.seconds * 1000) : null;
+    if (endsAt && endsAt > new Date()) {
+      const minsLeft = Math.ceil((endsAt - new Date()) / 60000);
+      statusEl.textContent = `🟢 Active — ${data.multiplier}x — ${minsLeft} min baqi`;
+      statusEl.style.color = '#27AE60';
+    } else {
+      statusEl.textContent = '⚫ Khatam ho gaya';
+      statusEl.style.color = '#9E9E9E';
+    }
+  } catch(e) {
+    document.getElementById('happyHourStatus').textContent = 'Error';
+  }
+}
+
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 async function loadDashboard() {
   try {
@@ -399,7 +486,8 @@ async function loadDashboard() {
     document.getElementById('activeDraws').textContent = active;
     document.getElementById('totalUsers').textContent = usersSnap.size;
     renderDraws(draws);
-    loadPendingReferrals(); // loads count only unless expanded
+    loadPendingReferrals();
+    checkHappyHourStatus(); // loads count only unless expanded
   } catch(e) {
     document.getElementById('drawsList').innerHTML = '<div class="loading">Error loading. Check Firestore rules.</div>';
   }
