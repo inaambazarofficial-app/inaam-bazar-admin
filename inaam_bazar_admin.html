@@ -165,6 +165,12 @@
     </div>
 
     <div class="section-title">
+      🗳️ Polls Management
+      <button class="add-draw-btn" onclick="showAddPollModal()">+ New Poll</button>
+    </div>
+    <div id="pollsList" style="margin-bottom:24px;"></div>
+
+    <div class="section-title">
       🎯 Draws Management
       <button class="add-draw-btn" onclick="showAddDrawModal()">+ New Draw</button>
     </div>
@@ -335,6 +341,49 @@
   </div>
 </div>
 
+<!-- Add Poll Modal -->
+<div class="modal-overlay" id="addPollModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">🗳️ Naya Poll Banao</div>
+      <button class="modal-close" onclick="closeModal('addPollModal')">×</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Poll Title</label>
+      <input class="form-input" id="pollTitle" placeholder="e.g. Agla Draw Kaunsa Ho?" value="Agla Draw Kaunsa Ho?">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Option 1</label>
+      <div class="form-row">
+        <input class="form-input" id="pollOpt1Emoji" placeholder="Emoji (e.g. 🎧)">
+        <input class="form-input" id="pollOpt1Name" placeholder="Name (e.g. Handfree)">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Option 2</label>
+      <div class="form-row">
+        <input class="form-input" id="pollOpt2Emoji" placeholder="Emoji (e.g. 🎵)">
+        <input class="form-input" id="pollOpt2Name" placeholder="Name (e.g. Airbuds)">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Option 3 (optional)</label>
+      <div class="form-row">
+        <input class="form-input" id="pollOpt3Emoji" placeholder="Emoji">
+        <input class="form-input" id="pollOpt3Name" placeholder="Name">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Option 4 (optional)</label>
+      <div class="form-row">
+        <input class="form-input" id="pollOpt4Emoji" placeholder="Emoji">
+        <input class="form-input" id="pollOpt4Name" placeholder="Name">
+      </div>
+    </div>
+    <button class="submit-btn" onclick="createPoll()">Poll Banao ✅</button>
+  </div>
+</div>
+
 <!-- Winner Confirm Modal -->
 <div class="modal-overlay" id="winnerModal">
   <div class="modal">
@@ -487,7 +536,8 @@ async function loadDashboard() {
     document.getElementById('totalUsers').textContent = usersSnap.size;
     renderDraws(draws);
     loadPendingReferrals();
-    checkHappyHourStatus(); // loads count only unless expanded
+    checkHappyHourStatus();
+    loadPolls(); // loads count only unless expanded
   } catch(e) {
     document.getElementById('drawsList').innerHTML = '<div class="loading">Error loading. Check Firestore rules.</div>';
   }
@@ -726,6 +776,106 @@ async function confirmWinner() {
     });
     showToast('🏆 Winner confirm! Ab Live Draw Chalao button dekhein.', false);
     setTimeout(() => loadDashboard(), 1500);
+  } catch(e) { showToast('❌ Error: ' + e.message, true); }
+}
+
+// ── Polls ─────────────────────────────────────────────────────────────────────
+function showAddPollModal() { document.getElementById('addPollModal').classList.add('show'); }
+
+async function createPoll() {
+  const title = document.getElementById('pollTitle').value.trim();
+  if (!title) { showToast('❌ Poll title daalo!', true); return; }
+
+  const options = [];
+  for (let i = 1; i <= 4; i++) {
+    const emoji = document.getElementById(`pollOpt${i}Emoji`).value.trim();
+    const name = document.getElementById(`pollOpt${i}Name`).value.trim();
+    if (emoji && name) {
+      options.push({ id: `opt${i}`, emoji, name });
+    }
+  }
+  if (options.length < 2) { showToast('❌ Kam se kam 2 options daalo!', true); return; }
+
+  const votesMap = {};
+  options.forEach(o => votesMap[o.id] = 0);
+
+  try {
+    // Close any existing active polls first
+    const existing = await db.collection('polls').where('status', '==', 'active').get();
+    for (const doc of existing.docs) {
+      await db.collection('polls').doc(doc.id).update({ status: 'closed' });
+    }
+
+    await db.collection('polls').add({
+      title, options, votes: votesMap, status: 'active',
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    closeModal('addPollModal');
+    showToast('✅ Poll ban gaya!', false);
+    document.getElementById('pollTitle').value = 'Agla Draw Kaunsa Ho?';
+    for (let i = 1; i <= 4; i++) {
+      document.getElementById(`pollOpt${i}Emoji`).value = '';
+      document.getElementById(`pollOpt${i}Name`).value = '';
+    }
+    loadPolls();
+  } catch(e) { showToast('❌ Error: ' + e.message, true); }
+}
+
+async function loadPolls() {
+  try {
+    const snap = await db.collection('polls').orderBy('createdAt', 'desc').limit(5).get();
+    if (snap.docs.length === 0) {
+      document.getElementById('pollsList').innerHTML = '';
+      return;
+    }
+    document.getElementById('pollsList').innerHTML = snap.docs.map(doc => {
+      const p = doc.data();
+      const isActive = p.status === 'active';
+      const totalVotes = Object.values(p.votes || {}).reduce((a,b) => a+b, 0);
+      const optionsHtml = (p.options || []).map(o => {
+        const v = (p.votes || {})[o.id] || 0;
+        const pct = totalVotes === 0 ? 0 : ((v / totalVotes) * 100).toFixed(0);
+        return `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.05);">
+          <span>${o.emoji} ${o.name}</span>
+          <span style="color:#F5C518;font-weight:bold;">${v} votes (${pct}%)</span>
+        </div>`;
+      }).join('');
+      return `
+        <div class="draw-card">
+          <div class="draw-card-header">
+            <div class="draw-info">
+              <div class="draw-name">${p.title}</div>
+              <div class="draw-desc">${totalVotes} total votes</div>
+            </div>
+            <span class="status-badge ${isActive ? 'status-active' : 'status-completed'}">${isActive ? '🟢 Active' : '⏹️ Closed'}</span>
+          </div>
+          ${optionsHtml}
+          <div class="draw-actions" style="margin-top:12px;">
+            ${isActive ? `<button class="btn btn-delete" onclick="closePoll('${doc.id}')">⏹️ Close Poll</button>` : ''}
+            <button class="btn btn-delete" onclick="deletePoll('${doc.id}')">🗑️ Delete</button>
+          </div>
+        </div>`;
+    }).join('');
+  } catch(e) {
+    document.getElementById('pollsList').innerHTML = '<div class="loading">Error loading polls: ' + e.message + '</div>';
+  }
+}
+
+async function closePoll(pollId) {
+  if (!confirm('Poll close karna chahte hain?')) return;
+  try {
+    await db.collection('polls').doc(pollId).update({ status: 'closed' });
+    showToast('⏹️ Poll close ho gaya', false);
+    loadPolls();
+  } catch(e) { showToast('❌ Error: ' + e.message, true); }
+}
+
+async function deletePoll(pollId) {
+  if (!confirm('Poll delete karna chahte hain?')) return;
+  try {
+    await db.collection('polls').doc(pollId).delete();
+    showToast('🗑️ Poll delete ho gaya', false);
+    loadPolls();
   } catch(e) { showToast('❌ Error: ' + e.message, true); }
 }
 
