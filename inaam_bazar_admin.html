@@ -173,6 +173,11 @@
         <input class="form-input" id="announcementText" placeholder="e.g. App maintenance kal 2 baje hogi" style="width:100%;">
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        <select class="form-input" id="announcementSpeed" style="width:100px;padding:8px;">
+          <option value="1">1x Speed</option>
+          <option value="2">2x Speed</option>
+          <option value="3">3x Speed</option>
+        </select>
         <button class="btn" style="background:#E74C3C;color:white;" onclick="startAnnouncement()">📢 Show Banner</button>
         <button class="btn" style="background:rgba(231,76,60,0.15);color:#E74C3C;border:1px solid rgba(231,76,60,0.4);" onclick="stopAnnouncement()">⏹️ Hide Banner</button>
       </div>
@@ -541,11 +546,13 @@ async function checkHappyHourStatus() {
 // ── Announcement Banner ──────────────────────────────────────────────────────
 async function startAnnouncement() {
   const text = document.getElementById('announcementText').value.trim();
+  const speed = parseInt(document.getElementById('announcementSpeed').value) || 1;
   if (!text) { showToast('❌ Pehle message likho!', true); return; }
   try {
     await db.collection('config').doc('announcement').set({
       active: true,
       text: text,
+      speed: speed,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
     });
     showToast('📢 Announcement banner live ho gaya!', false);
@@ -580,6 +587,7 @@ async function checkAnnouncementStatus() {
     statusEl.textContent = '🟢 Live: "' + (data.text || '').substring(0, 30) + (data.text && data.text.length > 30 ? '...' : '') + '"';
     statusEl.style.color = '#27AE60';
     document.getElementById('announcementText').value = data.text || '';
+    document.getElementById('announcementSpeed').value = data.speed || 1;
   } catch(e) {
     document.getElementById('announcementStatus').textContent = 'Error';
   }
@@ -588,11 +596,13 @@ async function checkAnnouncementStatus() {
 // ── Announcement Banner ──────────────────────────────────────────────────────
 async function startAnnouncement() {
   const text = document.getElementById('announcementText').value.trim();
+  const speed = parseInt(document.getElementById('announcementSpeed').value) || 1;
   if (!text) { showToast('❌ Pehle message likho!', true); return; }
   try {
     await db.collection('config').doc('announcement').set({
       active: true,
       text: text,
+      speed: speed,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
     });
     showToast('📢 Announcement banner live ho gaya!', false);
@@ -627,6 +637,7 @@ async function checkAnnouncementStatus() {
     statusEl.textContent = '🟢 Live: "' + (data.text || '').substring(0, 30) + (data.text && data.text.length > 30 ? '...' : '') + '"';
     statusEl.style.color = '#27AE60';
     document.getElementById('announcementText').value = data.text || '';
+    document.getElementById('announcementSpeed').value = data.speed || 1;
   } catch(e) {
     document.getElementById('announcementStatus').textContent = 'Error';
   }
