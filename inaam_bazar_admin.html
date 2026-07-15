@@ -178,6 +178,14 @@
           <option value="2">2x Speed</option>
           <option value="3">3x Speed</option>
         </select>
+        <select class="form-input" id="announcementDuration" style="width:130px;padding:8px;">
+          <option value="30">30 minutes</option>
+          <option value="60" selected>1 hour</option>
+          <option value="240">4 hours</option>
+          <option value="480">8 hours</option>
+          <option value="1440">24 hours</option>
+          <option value="forever">Forever</option>
+        </select>
         <button class="btn" style="background:#E74C3C;color:white;" onclick="startAnnouncement()">📢 Show Banner</button>
         <button class="btn" style="background:rgba(231,76,60,0.15);color:#E74C3C;border:1px solid rgba(231,76,60,0.4);" onclick="stopAnnouncement()">⏹️ Hide Banner</button>
       </div>
@@ -437,6 +445,15 @@ Question2|OptA|OptB|OptC|OptD|0"></textarea>
       <input class="form-input" id="pollTitle" placeholder="e.g. Agla Draw Kaunsa Ho?" value="Agla Draw Kaunsa Ho?">
     </div>
     <div class="form-group">
+      <label class="form-label">Poll Duration</label>
+      <select class="form-input" id="pollDuration">
+        <option value="1">1 din</option>
+        <option value="3" selected>3 din</option>
+        <option value="7">7 din</option>
+        <option value="forever">Forever (Manual close)</option>
+      </select>
+    </div>
+    <div class="form-group">
       <label class="form-label">Option 1</label>
       <div class="form-row">
         <input class="form-input" id="pollOpt1Emoji" placeholder="Emoji (e.g. 🎧)">
@@ -594,13 +611,15 @@ async function checkHappyHourStatus() {
       return;
     }
     const data = doc.data();
+    const startedAt = data.startedAt ? new Date(data.startedAt.seconds * 1000) : null;
     const endsAt = data.endsAt ? new Date(data.endsAt.seconds * 1000) : null;
+    const fmt = (d) => d ? d.toLocaleString('en-PK', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '-';
     if (endsAt && endsAt > new Date()) {
       const minsLeft = Math.ceil((endsAt - new Date()) / 60000);
-      statusEl.textContent = `🟢 Active — ${data.multiplier}x — ${minsLeft} min baqi`;
+      statusEl.innerHTML = `🟢 Active — ${data.multiplier}x — ${minsLeft} min baqi<br><span style="font-size:10px;">Start: ${fmt(startedAt)} • End: ${fmt(endsAt)}</span>`;
       statusEl.style.color = '#27AE60';
     } else {
-      statusEl.textContent = '⚫ Khatam ho gaya';
+      statusEl.innerHTML = `⚫ Khatam ho gaya<br><span style="font-size:10px;">Ended: ${fmt(endsAt)}</span>`;
       statusEl.style.color = '#9E9E9E';
     }
   } catch(e) {
@@ -612,14 +631,22 @@ async function checkHappyHourStatus() {
 async function startAnnouncement() {
   const text = document.getElementById('announcementText').value.trim();
   const speed = parseInt(document.getElementById('announcementSpeed').value) || 1;
+  const durationVal = document.getElementById('announcementDuration').value;
   if (!text) { showToast('❌ Pehle message likho!', true); return; }
   try {
-    await db.collection('config').doc('announcement').set({
+    const data = {
       active: true,
       text: text,
       speed: speed,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-    });
+    };
+    if (durationVal === 'forever') {
+      data.endsAt = null;
+    } else {
+      const durationMin = parseInt(durationVal);
+      data.endsAt = firebase.firestore.Timestamp.fromDate(new Date(Date.now() + durationMin * 60000));
+    }
+    await db.collection('config').doc('announcement').set(data);
     showToast('📢 Announcement banner live ho gaya!', false);
     checkAnnouncementStatus();
   } catch(e) {
@@ -649,7 +676,14 @@ async function checkAnnouncementStatus() {
       return;
     }
     const data = doc.data();
-    statusEl.textContent = '🟢 Live: "' + (data.text || '').substring(0, 30) + (data.text && data.text.length > 30 ? '...' : '') + '"';
+    const endsAt = data.endsAt ? new Date(data.endsAt.seconds * 1000) : null;
+    if (endsAt && endsAt <= new Date()) {
+      statusEl.textContent = '⚫ Khatam ho gaya';
+      statusEl.style.color = '#9E9E9E';
+      return;
+    }
+    const timeLeftStr = endsAt ? `${Math.ceil((endsAt - new Date()) / 60000)} min baqi` : 'Forever';
+    statusEl.textContent = '🟢 Live (' + timeLeftStr + '): "' + (data.text || '').substring(0, 25) + (data.text && data.text.length > 25 ? '...' : '') + '"';
     statusEl.style.color = '#27AE60';
     document.getElementById('announcementText').value = data.text || '';
     document.getElementById('announcementSpeed').value = data.speed || 1;
@@ -1148,6 +1182,8 @@ async function createPoll() {
   const votesMap = {};
   options.forEach(o => votesMap[o.id] = 0);
 
+  const durationVal = document.getElementById('pollDuration').value;
+
   try {
     // Close any existing active polls first
     const existing = await db.collection('polls').where('status', '==', 'active').get();
@@ -1155,13 +1191,22 @@ async function createPoll() {
       await db.collection('polls').doc(doc.id).update({ status: 'closed' });
     }
 
-    await db.collection('polls').add({
+    const pollData = {
       title, options, votes: votesMap, status: 'active',
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-    });
+    };
+    if (durationVal === 'forever') {
+      pollData.endsAt = null;
+    } else {
+      const durationDays = parseInt(durationVal);
+      pollData.endsAt = firebase.firestore.Timestamp.fromDate(new Date(Date.now() + durationDays * 24 * 60 * 60000));
+    }
+
+    await db.collection('polls').add(pollData);
     closeModal('addPollModal');
     showToast('✅ Poll ban gaya!', false);
     document.getElementById('pollTitle').value = 'Agla Draw Kaunsa Ho?';
+    document.getElementById('pollDuration').value = '3';
     for (let i = 1; i <= 4; i++) {
       document.getElementById(`pollOpt${i}Emoji`).value = '';
       document.getElementById(`pollOpt${i}Name`).value = '';
@@ -1181,6 +1226,22 @@ async function loadPolls() {
       const p = doc.data();
       const isActive = p.status === 'active';
       const totalVotes = Object.values(p.votes || {}).reduce((a,b) => a+b, 0);
+      const endsAt = p.endsAt ? new Date(p.endsAt.seconds * 1000) : null;
+      let timerStr = '';
+      if (isActive) {
+        if (endsAt) {
+          const msLeft = endsAt - new Date();
+          if (msLeft <= 0) {
+            timerStr = '⏰ Expired (band hone wala hai)';
+          } else {
+            const daysLeft = Math.floor(msLeft / (24*60*60000));
+            const hoursLeft = Math.floor((msLeft % (24*60*60000)) / (60*60000));
+            timerStr = `⏰ ${daysLeft}d ${hoursLeft}h baqi`;
+          }
+        } else {
+          timerStr = '♾️ Forever (manual close)';
+        }
+      }
       const optionsHtml = (p.options || []).map(o => {
         const v = (p.votes || {})[o.id] || 0;
         const pct = totalVotes === 0 ? 0 : ((v / totalVotes) * 100).toFixed(0);
@@ -1194,7 +1255,7 @@ async function loadPolls() {
           <div class="draw-card-header">
             <div class="draw-info">
               <div class="draw-name">${p.title}</div>
-              <div class="draw-desc">${totalVotes} total votes</div>
+              <div class="draw-desc">${totalVotes} total votes ${timerStr ? '• ' + timerStr : ''}</div>
             </div>
             <span class="status-badge ${isActive ? 'status-active' : 'status-completed'}">${isActive ? '🟢 Active' : '⏹️ Closed'}</span>
           </div>
