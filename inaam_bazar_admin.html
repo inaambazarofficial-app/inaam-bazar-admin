@@ -183,6 +183,64 @@
       </div>
     </div>
 
+    <div style="background:#16213E;border:1px solid rgba(52,152,219,0.4);border-radius:12px;padding:16px;margin-bottom:24px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <span style="font-size:15px;font-weight:bold;color:#3498DB;">🧠 Quiz Questions</span>
+        <span id="quizStatus" style="font-size:12px;color:#9E9E9E;">Loading...</span>
+      </div>
+
+      <div style="display:flex;gap:8px;margin-bottom:12px;">
+        <button class="filter-tab active" id="quizTabSingle" onclick="setQuizTab('single')">➕ Single</button>
+        <button class="filter-tab" id="quizTabBulk" onclick="setQuizTab('bulk')">📋 Bulk Import</button>
+        <button class="filter-tab" id="quizTabList" onclick="setQuizTab('list')">📄 View All</button>
+      </div>
+
+      <div id="quizSinglePanel">
+        <div class="form-group">
+          <label class="form-label">Question</label>
+          <input class="form-input" id="qSingleQuestion" placeholder="e.g. Pakistan ki rajdhani kya hai?">
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Option A</label><input class="form-input" id="qSingleOpt0" placeholder="Option A"></div>
+          <div class="form-group"><label class="form-label">Option B</label><input class="form-input" id="qSingleOpt1" placeholder="Option B"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Option C</label><input class="form-input" id="qSingleOpt2" placeholder="Option C"></div>
+          <div class="form-group"><label class="form-label">Option D</label><input class="form-input" id="qSingleOpt3" placeholder="Option D"></div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Correct Answer</label>
+          <select class="form-input" id="qSingleCorrect">
+            <option value="0">Option A</option>
+            <option value="1">Option B</option>
+            <option value="2">Option C</option>
+            <option value="3">Option D</option>
+          </select>
+        </div>
+        <button class="submit-btn" onclick="addSingleQuestion()">➕ Question Add Karo</button>
+      </div>
+
+      <div id="quizBulkPanel" style="display:none;">
+        <div class="form-group">
+          <label class="form-label">Paste questions (one per line)</label>
+          <div style="font-size:11px;color:#9E9E9E;margin-bottom:8px;">
+            Format: <code>Question|Option A|Option B|Option C|Option D|CorrectIndex(0-3)</code><br>
+            Example: <code>Pakistan ki rajdhani kya hai?|Lahore|Karachi|Islamabad|Peshawar|2</code>
+          </div>
+          <textarea class="form-input" id="qBulkText" rows="10" style="font-family:monospace;font-size:12px;resize:vertical;" placeholder="Question1|OptA|OptB|OptC|OptD|2
+Question2|OptA|OptB|OptC|OptD|0"></textarea>
+        </div>
+        <button class="submit-btn" onclick="addBulkQuestions()">📋 Bulk Import Karo</button>
+      </div>
+
+      <div id="quizListPanel" style="display:none;">
+        <div style="display:flex;gap:8px;margin-bottom:10px;">
+          <input class="form-input" id="quizSearchInput" placeholder="🔍 Question search karo..." oninput="renderQuizList()">
+        </div>
+        <div id="quizQuestionsList" style="max-height:400px;overflow-y:auto;"><div class="loading">Loading...</div></div>
+      </div>
+    </div>
+
     <div class="section-title">
       🗳️ Polls Management
       <button class="add-draw-btn" onclick="showAddPollModal()">+ New Poll</button>
@@ -643,6 +701,154 @@ async function checkAnnouncementStatus() {
   }
 }
 
+// ── Quiz Questions ────────────────────────────────────────────────────────────
+let allQuizQuestions = [];
+
+function setQuizTab(tab) {
+  document.getElementById('quizTabSingle').classList.toggle('active', tab === 'single');
+  document.getElementById('quizTabBulk').classList.toggle('active', tab === 'bulk');
+  document.getElementById('quizTabList').classList.toggle('active', tab === 'list');
+  document.getElementById('quizSinglePanel').style.display = tab === 'single' ? 'block' : 'none';
+  document.getElementById('quizBulkPanel').style.display = tab === 'bulk' ? 'block' : 'none';
+  document.getElementById('quizListPanel').style.display = tab === 'list' ? 'block' : 'none';
+  if (tab === 'list') loadQuizQuestions();
+}
+
+async function addSingleQuestion() {
+  const question = document.getElementById('qSingleQuestion').value.trim();
+  const options = [
+    document.getElementById('qSingleOpt0').value.trim(),
+    document.getElementById('qSingleOpt1').value.trim(),
+    document.getElementById('qSingleOpt2').value.trim(),
+    document.getElementById('qSingleOpt3').value.trim(),
+  ];
+  const correct = parseInt(document.getElementById('qSingleCorrect').value);
+
+  if (!question || options.some(o => !o)) {
+    showToast('❌ Sab fields fill karo!', true);
+    return;
+  }
+
+  try {
+    await db.collection('quiz_questions').add({
+      question, options, correct, used: false,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    showToast('✅ Question add ho gaya!', false);
+    document.getElementById('qSingleQuestion').value = '';
+    document.getElementById('qSingleOpt0').value = '';
+    document.getElementById('qSingleOpt1').value = '';
+    document.getElementById('qSingleOpt2').value = '';
+    document.getElementById('qSingleOpt3').value = '';
+    document.getElementById('qSingleCorrect').value = '0';
+    checkQuizStatus();
+  } catch(e) {
+    showToast('❌ Error: ' + e.message, true);
+  }
+}
+
+async function addBulkQuestions() {
+  const raw = document.getElementById('qBulkText').value.trim();
+  if (!raw) { showToast('❌ Pehle questions paste karo!', true); return; }
+
+  const lines = raw.split('\n').map(l => l.trim()).filter(l => l);
+  if (lines.length === 0) { showToast('❌ Koi valid line nahi mili!', true); return; }
+
+  let added = 0, skipped = 0;
+  const batch = db.batch();
+
+  for (const line of lines) {
+    const parts = line.split('|').map(p => p.trim());
+    if (parts.length !== 6) { skipped++; continue; }
+    const [question, optA, optB, optC, optD, correctStr] = parts;
+    const correct = parseInt(correctStr);
+    if (!question || !optA || !optB || !optC || !optD || isNaN(correct) || correct < 0 || correct > 3) {
+      skipped++;
+      continue;
+    }
+    const ref = db.collection('quiz_questions').doc();
+    batch.set(ref, {
+      question, options: [optA, optB, optC, optD], correct, used: false,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    added++;
+  }
+
+  if (added === 0) { showToast('❌ Koi valid question nahi mila. Format check karo!', true); return; }
+
+  try {
+    await batch.commit();
+    showToast(`✅ ${added} questions add ho gaye!` + (skipped > 0 ? ` (${skipped} skip hue — galat format)` : ''), false);
+    document.getElementById('qBulkText').value = '';
+    checkQuizStatus();
+  } catch(e) {
+    showToast('❌ Error: ' + e.message, true);
+  }
+}
+
+async function loadQuizQuestions() {
+  document.getElementById('quizQuestionsList').innerHTML = '<div class="loading">Loading...</div>';
+  try {
+    const snap = await db.collection('quiz_questions').orderBy('createdAt', 'desc').get();
+    allQuizQuestions = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderQuizList();
+  } catch(e) {
+    document.getElementById('quizQuestionsList').innerHTML = '<div class="loading">Error: ' + e.message + '</div>';
+  }
+}
+
+function renderQuizList() {
+  const searchTerm = (document.getElementById('quizSearchInput')?.value || '').toLowerCase();
+  const filtered = allQuizQuestions.filter(q =>
+    !searchTerm || (q.question || '').toLowerCase().includes(searchTerm)
+  );
+
+  if (filtered.length === 0) {
+    document.getElementById('quizQuestionsList').innerHTML = '<div class="loading">Koi question nahi mila.</div>';
+    return;
+  }
+
+  document.getElementById('quizQuestionsList').innerHTML = filtered.map(q => {
+    const optionsHtml = (q.options || []).map((opt, i) =>
+      `<span style="${i === q.correct ? 'color:#27AE60;font-weight:bold;' : 'color:#9E9E9E;'}">${i === q.correct ? '✓ ' : ''}${opt}</span>`
+    ).join(' &nbsp;•&nbsp; ');
+    return `
+      <div class="entry-item" style="flex-direction:column;align-items:flex-start;">
+        <div style="display:flex;justify-content:space-between;width:100%;align-items:flex-start;">
+          <div style="flex:1;">
+            <div class="entry-user">${q.question}</div>
+            <div class="entry-detail" style="margin-top:4px;">${optionsHtml}</div>
+            <div class="entry-detail" style="margin-top:4px;">${q.used ? '🔴 Used' : '🟢 Available'}</div>
+          </div>
+          <button class="btn btn-delete" style="padding:6px 10px;font-size:11px;margin-left:8px;" onclick="deleteQuizQuestion('${q.id}')">🗑️</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function deleteQuizQuestion(id) {
+  if (!confirm('Yeh question delete karna chahte hain?')) return;
+  try {
+    await db.collection('quiz_questions').doc(id).delete();
+    showToast('🗑️ Question delete ho gaya', false);
+    loadQuizQuestions();
+    checkQuizStatus();
+  } catch(e) { showToast('❌ Error: ' + e.message, true); }
+}
+
+async function checkQuizStatus() {
+  try {
+    const allSnap = await db.collection('quiz_questions').get();
+    const total = allSnap.size;
+    const usedCount = allSnap.docs.filter(d => d.data().used === true).length;
+    const remaining = total - usedCount;
+    document.getElementById('quizStatus').textContent =
+      `${remaining} available • ${usedCount} used • ${total} total`;
+  } catch(e) {
+    document.getElementById('quizStatus').textContent = 'Error';
+  }
+}
+
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 async function loadDashboard() {
   try {
@@ -657,6 +863,7 @@ async function loadDashboard() {
     loadPendingReferrals();
     checkHappyHourStatus();
     checkAnnouncementStatus();
+    checkQuizStatus();
     loadPolls(); // loads count only unless expanded
   } catch(e) {
     document.getElementById('drawsList').innerHTML = '<div class="loading">Error loading. Check Firestore rules.</div>';
