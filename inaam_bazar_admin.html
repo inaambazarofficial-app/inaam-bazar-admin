@@ -184,11 +184,15 @@
     </div>
 
     <div style="background:#16213E;border:1px solid rgba(52,152,219,0.4);border-radius:12px;padding:16px;margin-bottom:24px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;cursor:pointer;" onclick="toggleQuizPanel()">
         <span style="font-size:15px;font-weight:bold;color:#3498DB;">🧠 Quiz Questions</span>
-        <span id="quizStatus" style="font-size:12px;color:#9E9E9E;">Loading...</span>
+        <span style="display:flex;align-items:center;gap:8px;">
+          <span id="quizStatus" style="font-size:12px;color:#9E9E9E;">Loading...</span>
+          <span id="quizPanelToggleIcon" style="font-size:12px;color:#9E9E9E;">▼</span>
+        </span>
       </div>
 
+      <div id="quizPanelBody">
       <div style="display:flex;gap:8px;margin-bottom:12px;">
         <button class="filter-tab active" id="quizTabSingle" onclick="setQuizTab('single')">➕ Single</button>
         <button class="filter-tab" id="quizTabBulk" onclick="setQuizTab('bulk')">📋 Bulk Import</button>
@@ -239,13 +243,16 @@ Question2|OptA|OptB|OptC|OptD|0"></textarea>
         </div>
         <div id="quizQuestionsList" style="max-height:400px;overflow-y:auto;"><div class="loading">Loading...</div></div>
       </div>
+      </div>
     </div>
 
-    <div class="section-title">
-      🗳️ Polls Management
-      <button class="add-draw-btn" onclick="showAddPollModal()">+ New Poll</button>
+    <div class="section-title" style="cursor:pointer;" onclick="togglePollsPanel(event)">
+      <span>🗳️ Polls Management <span id="pollsPanelToggleIcon" style="font-size:12px;color:#9E9E9E;">▼</span></span>
+      <button class="add-draw-btn" onclick="event.stopPropagation(); showAddPollModal()">+ New Poll</button>
     </div>
+    <div id="pollsPanelBody">
     <div id="pollsList" style="margin-bottom:24px;"></div>
+    </div>
 
     <div class="section-title">
       🎯 Draws Management
@@ -703,6 +710,21 @@ async function checkAnnouncementStatus() {
 
 // ── Quiz Questions ────────────────────────────────────────────────────────────
 let allQuizQuestions = [];
+let quizPanelOpen = true;
+let pollsPanelOpen = true;
+
+function toggleQuizPanel() {
+  quizPanelOpen = !quizPanelOpen;
+  document.getElementById('quizPanelBody').style.display = quizPanelOpen ? 'block' : 'none';
+  document.getElementById('quizPanelToggleIcon').textContent = quizPanelOpen ? '▼' : '▶';
+}
+
+function togglePollsPanel(e) {
+  if (e) e.stopPropagation();
+  pollsPanelOpen = !pollsPanelOpen;
+  document.getElementById('pollsPanelBody').style.display = pollsPanelOpen ? 'block' : 'none';
+  document.getElementById('pollsPanelToggleIcon').textContent = pollsPanelOpen ? '▼' : '▶';
+}
 
 function setQuizTab(tab) {
   document.getElementById('quizTabSingle').classList.toggle('active', tab === 'single');
