@@ -634,6 +634,12 @@ async function startAnnouncement() {
   const durationVal = document.getElementById('announcementDuration').value;
   if (!text) { showToast('❌ Pehle message likho!', true); return; }
   try {
+    // Step 1: write a temp doc to get Firestore's server clock (not trusting PC clock)
+    const timeCheckRef = db.collection('config').doc('_time_check');
+    await timeCheckRef.set({ ts: firebase.firestore.FieldValue.serverTimestamp() });
+    const timeCheckDoc = await timeCheckRef.get();
+    const serverNow = timeCheckDoc.data().ts.toDate();
+
     const data = {
       active: true,
       text: text,
@@ -644,7 +650,7 @@ async function startAnnouncement() {
       data.endsAt = null;
     } else {
       const durationMin = parseInt(durationVal);
-      data.endsAt = firebase.firestore.Timestamp.fromDate(new Date(Date.now() + durationMin * 60000));
+      data.endsAt = firebase.firestore.Timestamp.fromDate(new Date(serverNow.getTime() + durationMin * 60000));
     }
     await db.collection('config').doc('announcement').set(data);
     showToast('📢 Announcement banner live ho gaya!', false);
@@ -1191,6 +1197,12 @@ async function createPoll() {
       await db.collection('polls').doc(doc.id).update({ status: 'closed' });
     }
 
+    // Get Firestore's server clock (not trusting PC clock)
+    const timeCheckRef = db.collection('config').doc('_time_check');
+    await timeCheckRef.set({ ts: firebase.firestore.FieldValue.serverTimestamp() });
+    const timeCheckDoc = await timeCheckRef.get();
+    const serverNow = timeCheckDoc.data().ts.toDate();
+
     const pollData = {
       title, options, votes: votesMap, status: 'active',
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -1199,7 +1211,7 @@ async function createPoll() {
       pollData.endsAt = null;
     } else {
       const durationDays = parseInt(durationVal);
-      pollData.endsAt = firebase.firestore.Timestamp.fromDate(new Date(Date.now() + durationDays * 24 * 60 * 60000));
+      pollData.endsAt = firebase.firestore.Timestamp.fromDate(new Date(serverNow.getTime() + durationDays * 24 * 60 * 60000));
     }
 
     await db.collection('polls').add(pollData);
