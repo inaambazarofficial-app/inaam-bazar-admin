@@ -254,6 +254,22 @@ Question2|OptA|OptB|OptC|OptD|0"></textarea>
       </div>
     </div>
 
+    <div class="section-title" style="cursor:pointer;" onclick="toggleClaimsPanel(event)">
+      <span>🎁 Pending Prize Claims <span id="claimsPanelToggleIcon" style="font-size:12px;color:#9E9E9E;">▼</span></span>
+      <span id="claimsCount" style="background:#E74C3C;padding:2px 10px;border-radius:12px;font-size:12px;color:white;">0</span>
+    </div>
+    <div id="claimsPanelBody">
+      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+        <button class="filter-tab active" id="claimFilterPending" onclick="setClaimFilter('pending_info')">⏳ Pending</button>
+        <button class="filter-tab" id="claimFilterReviewing" onclick="setClaimFilter('reviewing')">🔍 Reviewing</button>
+        <button class="filter-tab" id="claimFilterVerified" onclick="setClaimFilter('verified')">✅ Verified</button>
+        <button class="filter-tab" id="claimFilterShipped" onclick="setClaimFilter('shipped')">📦 Shipped</button>
+        <button class="filter-tab" id="claimFilterCompleted" onclick="setClaimFilter('completed')">🎉 Completed</button>
+        <button class="filter-tab" id="claimFilterAll" onclick="setClaimFilter('all')">Sab</button>
+      </div>
+      <div id="claimsList" style="margin-bottom:24px;"><div class="loading">Loading claims...</div></div>
+    </div>
+
     <div class="section-title" style="cursor:pointer;" onclick="togglePollsPanel(event)">
       <span>🗳️ Polls Management <span id="pollsPanelToggleIcon" style="font-size:12px;color:#9E9E9E;">▼</span></span>
       <button class="add-draw-btn" onclick="event.stopPropagation(); showAddPollModal()">+ New Poll</button>
