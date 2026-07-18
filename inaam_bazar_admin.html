@@ -1311,6 +1311,12 @@ async function confirmWinner() {
   closeModal('winnerModal');
   showToast('Winner save ho raha hai...', false);
   try {
+    // Remove any previous winner entry for this draw (handles reroll case)
+    const oldWinnersSnap = await db.collection('winners').where('drawId', '==', currentDrawId).get();
+    for (const oldDoc of oldWinnersSnap.docs) {
+      await db.collection('winners').doc(oldDoc.id).delete();
+    }
+
     const claimDeadline = new Date(Date.now() + 10 * 60000); // TESTING: 10 min instead of 2 days
     await db.collection('draws').doc(currentDrawId).update({
       status: 'active',
