@@ -877,6 +877,132 @@ async function checkQuizStatus() {
   }
 }
 
+// ── Prize Claims ──────────────────────────────────────────────────────────────
+let allClaimsCache = [];
+let claimFilter = 'pending_info';
+let claimsPanelOpen = true;
+
+function toggleClaimsPanel(e) {
+  if (e) e.stopPropagation();
+  claimsPanelOpen = !claimsPanelOpen;
+  document.getElementById('claimsPanelBody').style.display = claimsPanelOpen ? 'block' : 'none';
+  document.getElementById('claimsPanelToggleIcon').textContent = claimsPanelOpen ? '▼' : '▶';
+}
+
+function setClaimFilter(filter) {
+  claimFilter = filter;
+  ['Pending','Reviewing','Verified','Shipped','Completed','All'].forEach(f => {
+    document.getElementById('claimFilter' + f)?.classList.remove('active');
+  });
+  const idMap = {
+    'pending_info': 'claimFilterPending',
+    'reviewing': 'claimFilterReviewing',
+    'verified': 'claimFilterVerified',
+    'shipped': 'claimFilterShipped',
+    'completed': 'claimFilterCompleted',
+    'all': 'claimFilterAll',
+  };
+  document.getElementById(idMap[filter])?.classList.add('active');
+  renderClaims();
+}
+
+async function loadClaims() {
+  try {
+    const snap = await db.collection('prize_claims').orderBy('submittedAt', 'desc').get();
+    allClaimsCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const pendingCount = allClaimsCache.filter(c => c.status === 'pending_info' || c.status === 'reviewing').length;
+    document.getElementById('claimsCount').textContent = pendingCount;
+    renderClaims();
+  } catch(e) {
+    document.getElementById('claimsList').innerHTML = '<div class="loading">Error: ' + e.message + '</div>';
+  }
+}
+
+function renderClaims() {
+  const filtered = claimFilter === 'all'
+    ? allClaimsCache
+    : allClaimsCache.filter(c => c.status === claimFilter);
+
+  if (filtered.length === 0) {
+    document.getElementById('claimsList').innerHTML = '<div class="loading">Is filter mein koi claim nahi.</div>';
+    return;
+  }
+
+  const statusColors = {
+    'pending_info': '#F0A500',
+    'reviewing': '#3498DB',
+    'verified': '#9B59B6',
+    'shipped': '#E67E22',
+    'completed': '#27AE60',
+  };
+  const statusLabels = {
+    'pending_info': '⏳ Pending Review',
+    'reviewing': '🔍 Reviewing',
+    'verified': '✅ Verified',
+    'shipped': '📦 Shipped',
+    'completed': '🎉 Completed',
+  };
+
+  document.getElementById('claimsList').innerHTML = filtered.map(c => {
+    const color = statusColors[c.status] || '#9E9E9E';
+    const label = statusLabels[c.status] || c.status;
+    const submittedStr = c.submittedAt ? new Date(c.submittedAt.seconds * 1000).toLocaleString('en-PK') : '-';
+    const deadlineStr = c.claimDeadline ? new Date(c.claimDeadline.seconds * 1000).toLocaleString('en-PK') : '-';
+    const waLink = c.phone ? `https://wa.me/${c.phone.replace(/[^0-9]/g, '')}` : '#';
+
+    return `
+      <div class="draw-card">
+        <div class="draw-card-header">
+          <div class="draw-info">
+            <div class="draw-name">${c.fullName || 'Unknown'} — ${c.prizeName || ''}</div>
+            <div class="draw-desc">Submitted: ${submittedStr}</div>
+            <div class="draw-desc">Deadline: ${deadlineStr}</div>
+          </div>
+          <span class="status-badge" style="background:${color}22;color:${color};border:1px solid ${color}66;">${label}</span>
+        </div>
+        <div class="draw-stats" style="grid-template-columns: repeat(2, 1fr);">
+          <div class="draw-stat" style="text-align:left;padding:10px;">
+            <div style="font-size:11px;color:#9E9E9E;">📱 Phone</div>
+            <div style="font-size:14px;color:white;font-weight:bold;">${c.phone || '-'}</div>
+          </div>
+          <div class="draw-stat" style="text-align:left;padding:10px;">
+            <div style="font-size:11px;color:#9E9E9E;">🆔 CNIC</div>
+            <div style="font-size:14px;color:white;font-weight:bold;">${c.cnic || '-'}</div>
+          </div>
+        </div>
+        <div style="background:rgba(0,0,0,0.2);border-radius:8px;padding:10px;margin-bottom:12px;">
+          <div style="font-size:11px;color:#9E9E9E;margin-bottom:4px;">📍 Address</div>
+          <div style="font-size:13px;color:white;">${c.city || ''} — ${c.address || ''}</div>
+        </div>
+        <div class="draw-actions">
+          <a href="${waLink}" target="_blank" class="btn" style="background:#25D366;color:white;text-decoration:none;">💬 WhatsApp</a>
+          <select class="form-input" style="width:auto;padding:8px;" onchange="updateClaimStatus('${c.id}', this.value)">
+            <option value="">Status Badlein...</option>
+            <option value="pending_info" ${c.status === 'pending_info' ? 'selected' : ''}>⏳ Pending Review</option>
+            <option value="reviewing" ${c.status === 'reviewing' ? 'selected' : ''}>🔍 Reviewing</option>
+            <option value="verified" ${c.status === 'verified' ? 'selected' : ''}>✅ Verified</option>
+            <option value="shipped" ${c.status === 'shipped' ? 'selected' : ''}>📦 Shipped</option>
+            <option value="completed" ${c.status === 'completed' ? 'selected' : ''}>🎉 Completed</option>
+          </select>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function updateClaimStatus(claimId, newStatus) {
+  if (!newStatus) return;
+  try {
+    await db.collection('prize_claims').doc(claimId).update({
+      status: newStatus,
+      statusUpdatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    showToast('✅ Status update ho gaya!', false);
+    loadClaims();
+  } catch(e) {
+    showToast('❌ Error: ' + e.message, true);
+  }
+}
+
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 async function loadDashboard() {
   try {
@@ -892,6 +1018,7 @@ async function loadDashboard() {
     checkHappyHourStatus();
     checkAnnouncementStatus();
     checkQuizStatus();
+    loadClaims();
     loadPolls(); // loads count only unless expanded
   } catch(e) {
     document.getElementById('drawsList').innerHTML = '<div class="loading">Error loading. Check Firestore rules.</div>';
