@@ -144,6 +144,14 @@
       </div>
     </div>
 
+    <div style="background:#16213E;border:1px solid rgba(231,76,60,0.5);border-radius:12px;padding:16px;margin-bottom:24px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <span style="font-size:15px;font-weight:bold;color:#E74C3C;">⚠️ Expired Unclaimed Wins</span>
+        <span id="expiredWinsCount" style="background:#E74C3C;padding:2px 10px;border-radius:12px;font-size:12px;color:white;">0</span>
+      </div>
+      <div id="expiredWinsList"><div class="loading" style="padding:16px;">Loading...</div></div>
+    </div>
+
     <div style="background:#16213E;border:1px solid rgba(240,165,0,0.4);border-radius:12px;padding:16px;margin-bottom:24px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
         <span style="font-size:15px;font-weight:bold;color:#F0A500;">⚡ Happy Hour</span>
@@ -877,6 +885,87 @@ async function checkQuizStatus() {
   }
 }
 
+// ── Expired Unclaimed Wins ───────────────────────────────────────────────────
+async function checkExpiredWins() {
+  try {
+    const snap = await db.collection('draws')
+      .where('winnerId', '!=', null)
+      .get();
+
+    const now = new Date();
+    const expired = snap.docs.filter(doc => {
+      const d = doc.data();
+      if (d.claimSubmitted === true) return false;
+      if (!d.winnerClaimDeadline) return false;
+      const deadline = new Date(d.winnerClaimDeadline.seconds * 1000);
+      return deadline < now;
+    });
+
+    const container = document.getElementById('expiredWinsList');
+    const badge = document.getElementById('expiredWinsCount');
+    badge.textContent = expired.length;
+
+    if (expired.length === 0) {
+      container.innerHTML = '<div class="loading" style="padding:16px;">✅ Koi expired unclaimed win nahi!</div>';
+      return;
+    }
+
+    container.innerHTML = expired.map(doc => {
+      const d = doc.data();
+      const deadlineStr = new Date(d.winnerClaimDeadline.seconds * 1000).toLocaleString('en-PK');
+      return `
+        <div class="draw-card" style="border-color:rgba(231,76,60,0.5);">
+          <div class="draw-card-header">
+            <div class="draw-emoji">${d.prizeEmoji || '🎁'}</div>
+            <div class="draw-info">
+              <div class="draw-name">${d.prizeName}</div>
+              <div class="draw-desc">Winner: ${d.winnerName || 'Unknown'} (claim nahi kiya)</div>
+              <div class="date-passed">⚠️ Deadline guzar gaya: ${deadlineStr}</div>
+            </div>
+          </div>
+          <div class="draw-actions">
+            <button class="btn btn-winner" onclick="rerollExpiredWinner('${doc.id}')">🔄 Naya Winner Chuno</button>
+          </div>
+        </div>`;
+    }).join('');
+  } catch(e) {
+    document.getElementById('expiredWinsList').innerHTML = '<div class="loading">Error: ' + e.message + '</div>';
+  }
+}
+
+async function rerollExpiredWinner(drawId) {
+  if (!confirm('Purana winner claim nahi kar saka. Naya winner select karna chahte hain?')) return;
+  currentDrawId = drawId;
+  currentEntries = [];
+  showToast('Entries load ho rahi hain...', false);
+  try {
+    const drawDoc = await db.collection('draws').doc(drawId).get();
+    const oldWinnerId = drawDoc.data().winnerId;
+
+    const snap = await db.collection('entries').where('drawId', '==', drawId).get();
+    if (snap.docs.length === 0) { showToast('❌ Koi entry nahi!', true); return; }
+    const userIds = snap.docs.map(d => d.data().userId);
+    const userMap = {};
+    for (const uid of [...new Set(userIds)]) {
+      try { const uDoc = await db.collection('users').doc(uid).get(); if (uDoc.exists) userMap[uid] = uDoc.data(); } catch(e) {}
+    }
+    // Exclude the old winner from the new pool
+    currentEntries = snap.docs
+      .map(d => {
+        const data = d.data();
+        const user = userMap[data.userId] || {};
+        return { userId: data.userId, name: user.name || 'Unknown', email: user.email || '' };
+      })
+      .filter(e => e.userId !== oldWinnerId);
+
+    if (currentEntries.length === 0) {
+      showToast('❌ Koi aur entry nahi (sab same winner the)!', true);
+      return;
+    }
+    pickRandomAndShow();
+  } catch(e) { showToast('❌ Error: ' + e.message, true); }
+}
+
 // ── Prize Claims ──────────────────────────────────────────────────────────────
 let allClaimsCache = [];
 let claimFilter = 'pending_info';
@@ -1019,6 +1108,7 @@ async function loadDashboard() {
     checkAnnouncementStatus();
     checkQuizStatus();
     loadClaims();
+    checkExpiredWins();
     loadPolls(); // loads count only unless expanded
   } catch(e) {
     document.getElementById('drawsList').innerHTML = '<div class="loading">Error loading. Check Firestore rules.</div>';
@@ -1221,6 +1311,7 @@ async function confirmWinner() {
   closeModal('winnerModal');
   showToast('Winner save ho raha hai...', false);
   try {
+    const claimDeadline = new Date(Date.now() + 2 * 24 * 60 * 60000);
     await db.collection('draws').doc(currentDrawId).update({
       status: 'active',
       winnerId: selectedWinner.userId,
@@ -1228,6 +1319,8 @@ async function confirmWinner() {
       winnerCity: '',
       winnerEmail: selectedWinner.email || '',
       pendingCompletion: true,
+      winnerClaimDeadline: firebase.firestore.Timestamp.fromDate(claimDeadline),
+      claimSubmitted: false,
     });
     const drawSnapForWinner = await db.collection('draws').doc(currentDrawId).get();
     const drawDataForWinner = drawSnapForWinner.data() || {};
