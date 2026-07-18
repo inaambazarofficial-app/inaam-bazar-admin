@@ -1311,7 +1311,7 @@ async function confirmWinner() {
   closeModal('winnerModal');
   showToast('Winner save ho raha hai...', false);
   try {
-    const claimDeadline = new Date(Date.now() + 2 * 24 * 60 * 60000);
+    const claimDeadline = new Date(Date.now() + 10 * 60000); // TESTING: 10 min instead of 2 days
     await db.collection('draws').doc(currentDrawId).update({
       status: 'active',
       winnerId: selectedWinner.userId,
