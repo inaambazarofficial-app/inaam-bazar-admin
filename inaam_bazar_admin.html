@@ -154,6 +154,15 @@
 
     <div style="background:#16213E;border:1px solid rgba(240,165,0,0.4);border-radius:12px;padding:16px;margin-bottom:24px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <span style="font-size:15px;font-weight:bold;color:#F0A500;">🏆 Weekly Leaderboard</span>
+        <span id="leaderboardStatus" style="font-size:12px;color:#9E9E9E;">Loading...</span>
+      </div>
+      <div id="leaderboardCurrentStandings" style="margin-bottom:12px;font-size:13px;color:#9E9E9E;">Loading standings...</div>
+      <button class="btn" style="background:#F0A500;color:#3D1F00;" onclick="runWeeklyLeaderboardReset()">🏆 Run Weekly Reset & Rewards</button>
+    </div>
+
+    <div style="background:#16213E;border:1px solid rgba(240,165,0,0.4);border-radius:12px;padding:16px;margin-bottom:24px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
         <span style="font-size:15px;font-weight:bold;color:#F0A500;">⚡ Happy Hour</span>
         <span id="happyHourStatus" style="font-size:12px;color:#9E9E9E;">Loading...</span>
       </div>
@@ -581,6 +590,152 @@ auth.onAuthStateChanged(user => {
     document.getElementById('mainApp').style.display = 'none';
   }
 });
+
+// ── Weekly Leaderboard ──────────────────────────────────────────────────────
+const LEADERBOARD_THRESHOLD = 50;
+const LEADERBOARD_REWARDS = { 1: 25, 2: 20, 3: 10 };
+
+function getWeekStartKey(date) {
+  const day = date.getDay(); // 0=Sun, 1=Mon...
+  const daysSinceMonday = day === 0 ? 6 : day - 1;
+  const monday = new Date(date);
+  monday.setDate(date.getDate() - daysSinceMonday);
+  return `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, '0')}-${String(monday.getDate()).padStart(2, '0')}`;
+}
+
+async function checkLeaderboardStatus() {
+  try {
+    const configDoc = await db.collection('config').doc('weekly_leaderboard').get();
+    const statusEl = document.getElementById('leaderboardStatus');
+    const currentWeekKey = getWeekStartKey(new Date());
+
+    if (configDoc.exists && configDoc.data().currentWeekKey === currentWeekKey) {
+      statusEl.textContent = '✅ Is hafte process ho chuka hai';
+      statusEl.style.color = '#27AE60';
+    } else {
+      statusEl.textContent = '⏳ Is hafte abhi process nahi hua';
+      statusEl.style.color = '#F0A500';
+    }
+
+    // Show current live standings (not yet finalized)
+    const usersSnap = await db.collection('users')
+      .where('weeklyTicketsEarned', '>=', LEADERBOARD_THRESHOLD)
+      .orderBy('weeklyTicketsEarned', 'desc')
+      .limit(5)
+      .get();
+
+    const standingsEl = document.getElementById('leaderboardCurrentStandings');
+    if (usersSnap.docs.length === 0) {
+      standingsEl.innerHTML = `Koi qualify nahi hua abhi (min ${LEADERBOARD_THRESHOLD} tickets chahiye)`;
+      return;
+    }
+    standingsEl.innerHTML = usersSnap.docs.map((doc, i) => {
+      const d = doc.data();
+      return `${i + 1}. ${d.name || 'User'} — ${d.weeklyTicketsEarned} tickets`;
+    }).join('<br>');
+  } catch(e) {
+    document.getElementById('leaderboardStatus').textContent = 'Error: ' + e.message;
+  }
+}
+
+async function runWeeklyLeaderboardReset() {
+  if (!confirm('Weekly leaderboard reset chalana chahte hain? Yeh top 3 ko rewards dega aur sab ke weekly counters reset kar dega. Yeh action undo nahi ho sakta!')) return;
+
+  try {
+    showToast('Processing... Thodi der lagegi', false);
+    const weekKey = getWeekStartKey(new Date());
+
+    // Get qualifying users
+    const usersSnap = await db.collection('users')
+      .where('weeklyTicketsEarned', '>=', LEADERBOARD_THRESHOLD)
+      .orderBy('weeklyTicketsEarned', 'desc')
+      .limit(10)
+      .get();
+
+    let ranked = [];
+    if (usersSnap.docs.length > 0) {
+      let lastTickets = -1;
+      let lastRank = 0;
+      let position = 0;
+
+      for (const doc of usersSnap.docs) {
+        position++;
+        const tickets = doc.data().weeklyTicketsEarned || 0;
+        const rank = tickets === lastTickets ? lastRank : position;
+        if (rank > 3) break;
+        lastTickets = tickets;
+        lastRank = rank;
+        ranked.push({
+          userId: doc.id,
+          name: doc.data().name || 'User',
+          email: doc.data().email || '',
+          tickets: tickets,
+          rank: rank,
+        });
+      }
+
+      // Award tickets + mark for personal popup
+      const rewardBatch = db.batch();
+      for (const r of ranked) {
+        const reward = LEADERBOARD_REWARDS[r.rank] || 0;
+        if (reward > 0) {
+          const userRef = db.collection('users').doc(r.userId);
+          rewardBatch.update(userRef, {
+            tickets: firebase.firestore.FieldValue.increment(reward),
+            lastWeeklyRank: r.rank,
+            lastWeeklyRankReward: reward,
+            lastWeeklyRankSeen: false,
+          });
+        }
+      }
+      await rewardBatch.commit();
+
+      // Archive to history
+      await db.collection('weekly_leaderboard_history').add({
+        weekKey: weekKey,
+        winners: ranked,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+
+      // Log each reward
+      for (const r of ranked) {
+        const reward = LEADERBOARD_REWARDS[r.rank] || 0;
+        if (reward > 0) {
+          await db.collection('tickets_log').add({
+            userId: r.userId,
+            amount: reward,
+            type: 'credit',
+            reason: `Weekly Leaderboard — Rank #${r.rank}`,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+          });
+        }
+      }
+    }
+
+    // Reset ALL users' weekly counter (batched in groups of 400)
+    const allUsersSnap = await db.collection('users').get();
+    const docs = allUsersSnap.docs;
+    for (let i = 0; i < docs.length; i += 400) {
+      const chunk = docs.slice(i, i + 400);
+      const resetBatch = db.batch();
+      chunk.forEach(doc => {
+        resetBatch.update(doc.ref, { weeklyTicketsEarned: 0 });
+      });
+      await resetBatch.commit();
+    }
+
+    // Mark week as processed
+    await db.collection('config').doc('weekly_leaderboard').set({
+      currentWeekKey: weekKey,
+      processedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+
+    showToast(`✅ Reset complete! ${ranked.length} winners rewarded, sab ke counters reset ho gaye.`, false);
+    checkLeaderboardStatus();
+  } catch(e) {
+    showToast('❌ Error: ' + e.message, true);
+  }
+}
 
 // ── Happy Hour ────────────────────────────────────────────────────────────────
 async function startHappyHour() {
@@ -1109,6 +1264,7 @@ async function loadDashboard() {
     checkQuizStatus();
     loadClaims();
     checkExpiredWins();
+    checkLeaderboardStatus();
     loadPolls(); // loads count only unless expanded
   } catch(e) {
     document.getElementById('drawsList').innerHTML = '<div class="loading">Error loading. Check Firestore rules.</div>';
