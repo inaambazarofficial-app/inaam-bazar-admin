@@ -271,6 +271,20 @@ Question2|OptA|OptB|OptC|OptD|0"></textarea>
       </div>
     </div>
 
+    <div class="section-title" style="cursor:pointer;" onclick="toggleProofsPanel(event)">
+      <span>📸 Winner Proof Submissions <span id="proofsPanelToggleIcon" style="font-size:12px;color:#9E9E9E;">▼</span></span>
+      <span id="proofsCount" style="background:#E74C3C;padding:2px 10px;border-radius:12px;font-size:12px;color:white;">0</span>
+    </div>
+    <div id="proofsPanelBody">
+      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+        <button class="filter-tab active" id="proofFilterPending" onclick="setProofFilter('pending')">⏳ Pending</button>
+        <button class="filter-tab" id="proofFilterApproved" onclick="setProofFilter('approved')">✅ Approved</button>
+        <button class="filter-tab" id="proofFilterRejected" onclick="setProofFilter('rejected')">❌ Rejected</button>
+        <button class="filter-tab" id="proofFilterAll" onclick="setProofFilter('all')">Sab</button>
+      </div>
+      <div id="proofsList" style="margin-bottom:24px;"><div class="loading">Loading submissions...</div></div>
+    </div>
+
     <div class="section-title" style="cursor:pointer;" onclick="toggleClaimsPanel(event)">
       <span>🎁 Pending Prize Claims <span id="claimsPanelToggleIcon" style="font-size:12px;color:#9E9E9E;">▼</span></span>
       <span id="claimsCount" style="background:#E74C3C;padding:2px 10px;border-radius:12px;font-size:12px;color:white;">0</span>
@@ -1121,6 +1135,119 @@ async function rerollExpiredWinner(drawId) {
   } catch(e) { showToast('❌ Error: ' + e.message, true); }
 }
 
+// ── Winner Proof Submissions ──────────────────────────────────────────────────
+let allProofsCache = [];
+let proofFilter = 'pending';
+let proofsPanelOpen = true;
+const PROOF_REWARDS = { photo: 30, video: 50 };
+
+function toggleProofsPanel(e) {
+  if (e) e.stopPropagation();
+  proofsPanelOpen = !proofsPanelOpen;
+  document.getElementById('proofsPanelBody').style.display = proofsPanelOpen ? 'block' : 'none';
+  document.getElementById('proofsPanelToggleIcon').textContent = proofsPanelOpen ? '▼' : '▶';
+}
+
+function setProofFilter(filter) {
+  proofFilter = filter;
+  ['Pending','Approved','Rejected','All'].forEach(f => {
+    document.getElementById('proofFilter' + f)?.classList.remove('active');
+  });
+  const idMap = { pending: 'proofFilterPending', approved: 'proofFilterApproved', rejected: 'proofFilterRejected', all: 'proofFilterAll' };
+  document.getElementById(idMap[filter])?.classList.add('active');
+  renderProofs();
+}
+
+async function loadProofs() {
+  try {
+    const snap = await db.collection('winner_proofs').orderBy('submittedAt', 'desc').get();
+    allProofsCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    document.getElementById('proofsCount').textContent = allProofsCache.filter(p => p.status === 'pending').length;
+    renderProofs();
+  } catch(e) {
+    document.getElementById('proofsList').innerHTML = '<div class="loading">Error: ' + e.message + '</div>';
+  }
+}
+
+function renderProofs() {
+  const filtered = proofFilter === 'all' ? allProofsCache : allProofsCache.filter(p => p.status === proofFilter);
+  if (filtered.length === 0) {
+    document.getElementById('proofsList').innerHTML = '<div class="loading">Is filter mein koi submission nahi.</div>';
+    return;
+  }
+  const statusColors = { pending: '#F0A500', approved: '#27AE60', rejected: '#E74C3C' };
+  const statusLabels = { pending: '⏳ Pending', approved: '✅ Approved', rejected: '❌ Rejected' };
+
+  document.getElementById('proofsList').innerHTML = filtered.map(p => {
+    const color = statusColors[p.status] || '#9E9E9E';
+    const label = statusLabels[p.status] || p.status;
+    const submittedStr = p.submittedAt ? new Date(p.submittedAt.seconds * 1000).toLocaleString('en-PK') : '-';
+    const isVideo = p.type === 'video';
+    const mediaHtml = isVideo
+      ? `<video src="${p.fileUrl}" controls style="width:100%;max-height:300px;border-radius:8px;background:#000;"></video>`
+      : `<img src="${p.fileUrl}" style="width:100%;max-height:300px;object-fit:contain;border-radius:8px;background:#000;">`;
+
+    return `
+      <div class="draw-card">
+        <div class="draw-card-header">
+          <div class="draw-info">
+            <div class="draw-name">${p.prizeName || 'Prize'} — ${isVideo ? '🎥 Video' : '📸 Photo'}</div>
+            <div class="draw-desc">Submitted: ${submittedStr}</div>
+          </div>
+          <span class="status-badge" style="background:${color}22;color:${color};border:1px solid ${color}66;">${label}</span>
+        </div>
+        <div style="margin-bottom:12px;">${mediaHtml}</div>
+        ${p.status === 'pending' ? `
+        <div class="draw-actions">
+          <button class="btn btn-confirm" style="background:#27AE60;color:white;" onclick="approveProof('${p.id}', '${p.userId}', '${p.type}')">✅ Approve (+${PROOF_REWARDS[p.type] || 0} tickets)</button>
+          <button class="btn btn-delete" onclick="rejectProof('${p.id}')">❌ Reject</button>
+        </div>` : ''}
+      </div>`;
+  }).join('');
+}
+
+async function approveProof(proofId, userId, type) {
+  const reward = PROOF_REWARDS[type] || 0;
+  if (!confirm(`Approve karna chahte hain? User ko +${reward} tickets milenge.`)) return;
+  try {
+    await db.collection('winner_proofs').doc(proofId).update({
+      status: 'approved',
+      approvedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    await db.collection('users').doc(userId).update({
+      tickets: firebase.firestore.FieldValue.increment(reward),
+    });
+    await db.collection('tickets_log').add({
+      userId: userId,
+      amount: reward,
+      type: 'credit',
+      reason: `Winner proof approved — ${type}`,
+      timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    await db.collection('notifications').add({
+      userId: userId,
+      title: '✅ Aapka Proof Approve Ho Gaya!',
+      body: `+${reward} tickets mil gaye! Shukriya submit karne ke liye.`,
+      type: 'general', sent: false,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    showToast(`✅ Approved! +${reward} tickets diye gaye.`, false);
+    loadProofs();
+  } catch(e) { showToast('❌ Error: ' + e.message, true); }
+}
+
+async function rejectProof(proofId) {
+  if (!confirm('Reject karna chahte hain? Koi tickets nahi milenge.')) return;
+  try {
+    await db.collection('winner_proofs').doc(proofId).update({
+      status: 'rejected',
+      rejectedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    showToast('❌ Submission reject ho gaya', false);
+    loadProofs();
+  } catch(e) { showToast('❌ Error: ' + e.message, true); }
+}
+
 // ── Prize Claims ──────────────────────────────────────────────────────────────
 let allClaimsCache = [];
 let claimFilter = 'pending_info';
@@ -1263,6 +1390,7 @@ async function loadDashboard() {
     checkAnnouncementStatus();
     checkQuizStatus();
     loadClaims();
+    loadProofs();
     checkExpiredWins();
     checkLeaderboardStatus();
     loadPolls(); // loads count only unless expanded
