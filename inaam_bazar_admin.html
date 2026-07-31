@@ -213,11 +213,11 @@
         <span style="font-size:15px;font-weight:bold;color:#3498DB;">🧠 Quiz Questions</span>
         <span style="display:flex;align-items:center;gap:8px;">
           <span id="quizStatus" style="font-size:12px;color:#9E9E9E;">Loading...</span>
-          <span id="quizPanelToggleIcon" style="font-size:12px;color:#9E9E9E;">▼</span>
+          <span id="quizPanelToggleIcon" style="font-size:12px;color:#9E9E9E;">▶</span>
         </span>
       </div>
 
-      <div id="quizPanelBody">
+      <div id="quizPanelBody" style="display:none;">
       <div style="display:flex;gap:8px;margin-bottom:12px;">
         <button class="filter-tab active" id="quizTabSingle" onclick="setQuizTab('single')">➕ Single</button>
         <button class="filter-tab" id="quizTabBulk" onclick="setQuizTab('bulk')">📋 Bulk Import</button>
@@ -272,10 +272,10 @@ Question2|OptA|OptB|OptC|OptD|0"></textarea>
     </div>
 
     <div class="section-title" style="cursor:pointer;" onclick="toggleProofsPanel(event)">
-      <span>📸 Winner Proof Submissions <span id="proofsPanelToggleIcon" style="font-size:12px;color:#9E9E9E;">▼</span></span>
+      <span>📸 Winner Proof Submissions <span id="proofsPanelToggleIcon" style="font-size:12px;color:#9E9E9E;">▶</span></span>
       <span id="proofsCount" style="background:#E74C3C;padding:2px 10px;border-radius:12px;font-size:12px;color:white;">0</span>
     </div>
-    <div id="proofsPanelBody">
+    <div id="proofsPanelBody" style="display:none;">
       <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
         <button class="filter-tab active" id="proofFilterPending" onclick="setProofFilter('pending')">⏳ Pending</button>
         <button class="filter-tab" id="proofFilterApproved" onclick="setProofFilter('approved')">✅ Approved</button>
@@ -286,10 +286,10 @@ Question2|OptA|OptB|OptC|OptD|0"></textarea>
     </div>
 
     <div class="section-title" style="cursor:pointer;" onclick="toggleClaimsPanel(event)">
-      <span>🎁 Pending Prize Claims <span id="claimsPanelToggleIcon" style="font-size:12px;color:#9E9E9E;">▼</span></span>
+      <span>🎁 Pending Prize Claims <span id="claimsPanelToggleIcon" style="font-size:12px;color:#9E9E9E;">▶</span></span>
       <span id="claimsCount" style="background:#E74C3C;padding:2px 10px;border-radius:12px;font-size:12px;color:white;">0</span>
     </div>
-    <div id="claimsPanelBody">
+    <div id="claimsPanelBody" style="display:none;">
       <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
         <button class="filter-tab active" id="claimFilterPending" onclick="setClaimFilter('pending_info')">⏳ Pending</button>
         <button class="filter-tab" id="claimFilterReviewing" onclick="setClaimFilter('reviewing')">🔍 Reviewing</button>
@@ -302,10 +302,10 @@ Question2|OptA|OptB|OptC|OptD|0"></textarea>
     </div>
 
     <div class="section-title" style="cursor:pointer;" onclick="togglePollsPanel(event)">
-      <span>🗳️ Polls Management <span id="pollsPanelToggleIcon" style="font-size:12px;color:#9E9E9E;">▼</span></span>
+      <span>🗳️ Polls Management <span id="pollsPanelToggleIcon" style="font-size:12px;color:#9E9E9E;">▶</span></span>
       <button class="add-draw-btn" onclick="event.stopPropagation(); showAddPollModal()">+ New Poll</button>
     </div>
-    <div id="pollsPanelBody">
+    <div id="pollsPanelBody" style="display:none;">
     <div id="pollsList" style="margin-bottom:24px;"></div>
     </div>
 
@@ -893,8 +893,8 @@ async function checkAnnouncementStatus() {
 
 // ── Quiz Questions ────────────────────────────────────────────────────────────
 let allQuizQuestions = [];
-let quizPanelOpen = true;
-let pollsPanelOpen = true;
+let quizPanelOpen = false;
+let pollsPanelOpen = false;
 
 function toggleQuizPanel() {
   quizPanelOpen = !quizPanelOpen;
@@ -1150,7 +1150,7 @@ async function rerollExpiredWinner(drawId) {
 // ── Winner Proof Submissions ──────────────────────────────────────────────────
 let allProofsCache = [];
 let proofFilter = 'pending';
-let proofsPanelOpen = true;
+let proofsPanelOpen = false;
 const PROOF_REWARDS = { photo: 30, video: 50 };
 
 function toggleProofsPanel(e) {
@@ -1263,7 +1263,7 @@ async function rejectProof(proofId) {
 // ── Prize Claims ──────────────────────────────────────────────────────────────
 let allClaimsCache = [];
 let claimFilter = 'pending_info';
-let claimsPanelOpen = true;
+let claimsPanelOpen = false;
 
 function toggleClaimsPanel(e) {
   if (e) e.stopPropagation();
