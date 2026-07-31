@@ -1094,12 +1094,24 @@ async function checkExpiredWins() {
           </div>
           <div class="draw-actions">
             <button class="btn btn-winner" onclick="rerollExpiredWinner('${doc.id}')">🔄 Naya Winner Chuno</button>
+            <button class="btn btn-delete" onclick="dismissExpiredWin('${doc.id}')">🗑️ Dismiss (Hide)</button>
           </div>
         </div>`;
     }).join('');
   } catch(e) {
     document.getElementById('expiredWinsList').innerHTML = '<div class="loading">Error: ' + e.message + '</div>';
   }
+}
+
+async function dismissExpiredWin(drawId) {
+  if (!confirm('Yeh entry list se hide karna chahte hain? Draw ka status nahi badlega, sirf yeh warning hide ho jayegi.')) return;
+  try {
+    await db.collection('draws').doc(drawId).update({
+      claimSubmitted: true, // marks it as "handled" so it no longer shows as expired-unclaimed
+    });
+    showToast('🗑️ Entry hide ho gayi', false);
+    checkExpiredWins();
+  } catch(e) { showToast('❌ Error: ' + e.message, true); }
 }
 
 async function rerollExpiredWinner(drawId) {
