@@ -153,63 +153,78 @@
     </div>
 
     <div style="background:#16213E;border:1px solid rgba(240,165,0,0.4);border-radius:12px;padding:16px;margin-bottom:24px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="toggleLeaderboardPanel()">
         <span style="font-size:15px;font-weight:bold;color:#F0A500;">🏆 Weekly Leaderboard</span>
-        <span id="leaderboardEnabledStatus" style="font-size:12px;color:#9E9E9E;">Loading...</span>
+        <span style="display:flex;align-items:center;gap:8px;">
+          <span id="leaderboardEnabledStatus" style="font-size:12px;color:#9E9E9E;">Loading...</span>
+          <span id="leaderboardToggleIcon" style="font-size:12px;color:#9E9E9E;">▶</span>
+        </span>
       </div>
-      <div id="leaderboardStatus" style="font-size:12px;color:#9E9E9E;margin-bottom:10px;">Loading...</div>
-      <div id="leaderboardCurrentStandings" style="margin-bottom:12px;font-size:13px;color:#9E9E9E;">Loading standings...</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        <button class="btn" style="background:#F0A500;color:#3D1F00;" onclick="runWeeklyLeaderboardReset()">🏆 Run Weekly Reset & Rewards</button>
-        <button class="btn" style="background:#27AE60;color:white;" onclick="enableLeaderboard()">✅ Enable Leaderboard</button>
-        <button class="btn" style="background:rgba(231,76,60,0.15);color:#E74C3C;border:1px solid rgba(231,76,60,0.4);" onclick="disableLeaderboard()">⏹️ Disable Leaderboard</button>
+      <div id="leaderboardPanelBody" style="display:none;margin-top:10px;">
+        <div id="leaderboardStatus" style="font-size:12px;color:#9E9E9E;margin-bottom:10px;">Loading...</div>
+        <div id="leaderboardCurrentStandings" style="margin-bottom:12px;font-size:13px;color:#9E9E9E;">Loading standings...</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn" style="background:#F0A500;color:#3D1F00;" onclick="runWeeklyLeaderboardReset()">🏆 Run Weekly Reset & Rewards</button>
+          <button class="btn" style="background:#27AE60;color:white;" onclick="enableLeaderboard()">✅ Enable Leaderboard</button>
+          <button class="btn" style="background:rgba(231,76,60,0.15);color:#E74C3C;border:1px solid rgba(231,76,60,0.4);" onclick="disableLeaderboard()">⏹️ Disable Leaderboard</button>
+        </div>
       </div>
     </div>
 
     <div style="background:#16213E;border:1px solid rgba(240,165,0,0.4);border-radius:12px;padding:16px;margin-bottom:24px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="toggleHappyHourPanel()">
         <span style="font-size:15px;font-weight:bold;color:#F0A500;">⚡ Happy Hour</span>
-        <span id="happyHourStatus" style="font-size:12px;color:#9E9E9E;">Loading...</span>
+        <span style="display:flex;align-items:center;gap:8px;">
+          <span id="happyHourStatus" style="font-size:12px;color:#9E9E9E;">Loading...</span>
+          <span id="happyHourToggleIcon" style="font-size:12px;color:#9E9E9E;">▶</span>
+        </span>
       </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-        <select class="form-input" id="happyHourMultiplier" style="width:100px;padding:8px;">
-          <option value="2">2x</option>
-          <option value="3">3x</option>
-        </select>
-        <select class="form-input" id="happyHourDuration" style="width:120px;padding:8px;">
-          <option value="30">30 min</option>
-          <option value="60" selected>60 min</option>
-          <option value="90">90 min</option>
-        </select>
-        <button class="btn" style="background:#F0A500;color:#3D1F00;" onclick="startHappyHour()">🚀 Start Happy Hour</button>
-        <button class="btn" style="background:rgba(231,76,60,0.15);color:#E74C3C;border:1px solid rgba(231,76,60,0.4);" onclick="stopHappyHour()">⏹️ Stop Now</button>
+      <div id="happyHourPanelBody" style="display:none;margin-top:10px;">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+          <select class="form-input" id="happyHourMultiplier" style="width:100px;padding:8px;">
+            <option value="2">2x</option>
+            <option value="3">3x</option>
+          </select>
+          <select class="form-input" id="happyHourDuration" style="width:120px;padding:8px;">
+            <option value="30">30 min</option>
+            <option value="60" selected>60 min</option>
+            <option value="90">90 min</option>
+          </select>
+          <button class="btn" style="background:#F0A500;color:#3D1F00;" onclick="startHappyHour()">🚀 Start Happy Hour</button>
+          <button class="btn" style="background:rgba(231,76,60,0.15);color:#E74C3C;border:1px solid rgba(231,76,60,0.4);" onclick="stopHappyHour()">⏹️ Stop Now</button>
+        </div>
       </div>
     </div>
 
     <div style="background:#16213E;border:1px solid rgba(231,76,60,0.4);border-radius:12px;padding:16px;margin-bottom:24px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="toggleAnnouncementPanel()">
         <span style="font-size:15px;font-weight:bold;color:#E74C3C;">📢 Announcement Banner</span>
-        <span id="announcementStatus" style="font-size:12px;color:#9E9E9E;">Loading...</span>
+        <span style="display:flex;align-items:center;gap:8px;">
+          <span id="announcementStatus" style="font-size:12px;color:#9E9E9E;">Loading...</span>
+          <span id="announcementToggleIcon" style="font-size:12px;color:#9E9E9E;">▶</span>
+        </span>
       </div>
-      <div class="form-group" style="margin-bottom:10px;">
-        <input class="form-input" id="announcementText" placeholder="e.g. App maintenance kal 2 baje hogi" style="width:100%;">
-      </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-        <select class="form-input" id="announcementSpeed" style="width:100px;padding:8px;">
-          <option value="1">1x Speed</option>
-          <option value="2">2x Speed</option>
-          <option value="3">3x Speed</option>
-        </select>
-        <select class="form-input" id="announcementDuration" style="width:130px;padding:8px;">
-          <option value="30">30 minutes</option>
-          <option value="60" selected>1 hour</option>
-          <option value="240">4 hours</option>
-          <option value="480">8 hours</option>
-          <option value="1440">24 hours</option>
-          <option value="forever">Forever</option>
-        </select>
-        <button class="btn" style="background:#E74C3C;color:white;" onclick="startAnnouncement()">📢 Show Banner</button>
-        <button class="btn" style="background:rgba(231,76,60,0.15);color:#E74C3C;border:1px solid rgba(231,76,60,0.4);" onclick="stopAnnouncement()">⏹️ Hide Banner</button>
+      <div id="announcementPanelBody" style="display:none;margin-top:10px;">
+        <div class="form-group" style="margin-bottom:10px;">
+          <input class="form-input" id="announcementText" placeholder="e.g. App maintenance kal 2 baje hogi" style="width:100%;">
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+          <select class="form-input" id="announcementSpeed" style="width:100px;padding:8px;">
+            <option value="1">1x Speed</option>
+            <option value="2">2x Speed</option>
+            <option value="3">3x Speed</option>
+          </select>
+          <select class="form-input" id="announcementDuration" style="width:130px;padding:8px;">
+            <option value="30">30 minutes</option>
+            <option value="60" selected>1 hour</option>
+            <option value="240">4 hours</option>
+            <option value="480">8 hours</option>
+            <option value="1440">24 hours</option>
+            <option value="forever">Forever</option>
+          </select>
+          <button class="btn" style="background:#E74C3C;color:white;" onclick="startAnnouncement()">📢 Show Banner</button>
+          <button class="btn" style="background:rgba(231,76,60,0.15);color:#E74C3C;border:1px solid rgba(231,76,60,0.4);" onclick="stopAnnouncement()">⏹️ Hide Banner</button>
+        </div>
       </div>
     </div>
 
@@ -636,6 +651,9 @@ async function checkLeaderboardStatus() {
     } else {
       enabledEl.textContent = '🔴 Disabled';
       enabledEl.style.color = '#E74C3C';
+      leaderboardPanelOpen = true;
+      document.getElementById('leaderboardPanelBody').style.display = 'block';
+      document.getElementById('leaderboardToggleIcon').textContent = '▼';
     }
 
     if (configDoc.exists && configDoc.data().currentWeekKey === currentWeekKey) {
@@ -853,6 +871,9 @@ async function checkHappyHourStatus() {
       const minsLeft = Math.ceil((endsAt - new Date()) / 60000);
       statusEl.innerHTML = `🟢 Active — ${data.multiplier}x — ${minsLeft} min baqi<br><span style="font-size:10px;">Start: ${fmt(startedAt)} • End: ${fmt(endsAt)}</span>`;
       statusEl.style.color = '#27AE60';
+      happyHourPanelOpen = true;
+      document.getElementById('happyHourPanelBody').style.display = 'block';
+      document.getElementById('happyHourToggleIcon').textContent = '▼';
     } else {
       statusEl.innerHTML = `⚫ Khatam ho gaya<br><span style="font-size:10px;">Ended: ${fmt(endsAt)}</span>`;
       statusEl.style.color = '#9E9E9E';
@@ -928,6 +949,9 @@ async function checkAnnouncementStatus() {
     statusEl.style.color = '#27AE60';
     document.getElementById('announcementText').value = data.text || '';
     document.getElementById('announcementSpeed').value = data.speed || 1;
+    announcementPanelOpen = true;
+    document.getElementById('announcementPanelBody').style.display = 'block';
+    document.getElementById('announcementToggleIcon').textContent = '▼';
   } catch(e) {
     document.getElementById('announcementStatus').textContent = 'Error';
   }
@@ -937,6 +961,28 @@ async function checkAnnouncementStatus() {
 let allQuizQuestions = [];
 let quizPanelOpen = false;
 let pollsPanelOpen = false;
+
+let leaderboardPanelOpen = false;
+let happyHourPanelOpen = false;
+let announcementPanelOpen = false;
+
+function toggleLeaderboardPanel() {
+  leaderboardPanelOpen = !leaderboardPanelOpen;
+  document.getElementById('leaderboardPanelBody').style.display = leaderboardPanelOpen ? 'block' : 'none';
+  document.getElementById('leaderboardToggleIcon').textContent = leaderboardPanelOpen ? '▼' : '▶';
+}
+
+function toggleHappyHourPanel() {
+  happyHourPanelOpen = !happyHourPanelOpen;
+  document.getElementById('happyHourPanelBody').style.display = happyHourPanelOpen ? 'block' : 'none';
+  document.getElementById('happyHourToggleIcon').textContent = happyHourPanelOpen ? '▼' : '▶';
+}
+
+function toggleAnnouncementPanel() {
+  announcementPanelOpen = !announcementPanelOpen;
+  document.getElementById('announcementPanelBody').style.display = announcementPanelOpen ? 'block' : 'none';
+  document.getElementById('announcementToggleIcon').textContent = announcementPanelOpen ? '▼' : '▶';
+}
 
 function toggleQuizPanel() {
   quizPanelOpen = !quizPanelOpen;
@@ -1969,7 +2015,7 @@ let pendingSectionOpen = false;
 function togglePendingSection() {
   pendingSectionOpen = !pendingSectionOpen;
   document.getElementById('pendingReferralsList').style.display = pendingSectionOpen ? 'block' : 'none';
-  document.getElementById('pendingToggleIcon').textContent = pendingSectionOpen ? '▲' : '▼';
+  document.getElementById('pendingToggleIcon').textContent = pendingSectionOpen ? '▼' : '▶';
   if (pendingSectionOpen) loadPendingReferrals();
 }
 
