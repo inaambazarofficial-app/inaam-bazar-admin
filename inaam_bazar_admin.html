@@ -651,9 +651,6 @@ async function checkLeaderboardStatus() {
     } else {
       enabledEl.textContent = '🔴 Disabled';
       enabledEl.style.color = '#E74C3C';
-      leaderboardPanelOpen = true;
-      document.getElementById('leaderboardPanelBody').style.display = 'block';
-      document.getElementById('leaderboardToggleIcon').textContent = '▼';
     }
 
     if (configDoc.exists && configDoc.data().currentWeekKey === currentWeekKey) {
