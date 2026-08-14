@@ -155,10 +155,15 @@
     <div style="background:#16213E;border:1px solid rgba(240,165,0,0.4);border-radius:12px;padding:16px;margin-bottom:24px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
         <span style="font-size:15px;font-weight:bold;color:#F0A500;">🏆 Weekly Leaderboard</span>
-        <span id="leaderboardStatus" style="font-size:12px;color:#9E9E9E;">Loading...</span>
+        <span id="leaderboardEnabledStatus" style="font-size:12px;color:#9E9E9E;">Loading...</span>
       </div>
+      <div id="leaderboardStatus" style="font-size:12px;color:#9E9E9E;margin-bottom:10px;">Loading...</div>
       <div id="leaderboardCurrentStandings" style="margin-bottom:12px;font-size:13px;color:#9E9E9E;">Loading standings...</div>
-      <button class="btn" style="background:#F0A500;color:#3D1F00;" onclick="runWeeklyLeaderboardReset()">🏆 Run Weekly Reset & Rewards</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn" style="background:#F0A500;color:#3D1F00;" onclick="runWeeklyLeaderboardReset()">🏆 Run Weekly Reset & Rewards</button>
+        <button class="btn" style="background:#27AE60;color:white;" onclick="enableLeaderboard()">✅ Enable Leaderboard</button>
+        <button class="btn" style="background:rgba(231,76,60,0.15);color:#E74C3C;border:1px solid rgba(231,76,60,0.4);" onclick="disableLeaderboard()">⏹️ Disable Leaderboard</button>
+      </div>
     </div>
 
     <div style="background:#16213E;border:1px solid rgba(240,165,0,0.4);border-radius:12px;padding:16px;margin-bottom:24px;">
@@ -621,7 +626,17 @@ async function checkLeaderboardStatus() {
   try {
     const configDoc = await db.collection('config').doc('weekly_leaderboard').get();
     const statusEl = document.getElementById('leaderboardStatus');
+    const enabledEl = document.getElementById('leaderboardEnabledStatus');
     const currentWeekKey = getWeekStartKey(new Date());
+
+    const isEnabled = !configDoc.exists || configDoc.data().enabled !== false;
+    if (isEnabled) {
+      enabledEl.textContent = '🟢 Enabled';
+      enabledEl.style.color = '#27AE60';
+    } else {
+      enabledEl.textContent = '🔴 Disabled';
+      enabledEl.style.color = '#E74C3C';
+    }
 
     if (configDoc.exists && configDoc.data().currentWeekKey === currentWeekKey) {
       statusEl.textContent = '✅ Is hafte process ho chuka hai';
@@ -652,7 +667,34 @@ async function checkLeaderboardStatus() {
   }
 }
 
+async function enableLeaderboard() {
+  try {
+    await db.collection('config').doc('weekly_leaderboard').set({
+      enabled: true,
+    }, { merge: true });
+    showToast('✅ Leaderboard enable ho gaya!', false);
+    checkLeaderboardStatus();
+  } catch(e) { showToast('❌ Error: ' + e.message, true); }
+}
+
+async function disableLeaderboard() {
+  if (!confirm('Leaderboard disable karna chahte hain? Users apna progress dekh sakenge lekin admin reset nahi chala sakta jab tak dobara enable na ho.')) return;
+  try {
+    await db.collection('config').doc('weekly_leaderboard').set({
+      enabled: false,
+    }, { merge: true });
+    showToast('⏹️ Leaderboard disable kar diya', false);
+    checkLeaderboardStatus();
+  } catch(e) { showToast('❌ Error: ' + e.message, true); }
+}
+
 async function runWeeklyLeaderboardReset() {
+  try {
+    const configDoc = await db.collection('config').doc('weekly_leaderboard').get();
+    const isEnabled = !configDoc.exists || configDoc.data().enabled !== false;
+    if (!isEnabled) { showToast('❌ Leaderboard disabled hai! Pehle enable karo.', true); return; }
+  } catch(e) {}
+
   if (!confirm('Weekly leaderboard reset chalana chahte hain? Yeh top 3 ko rewards dega aur sab ke weekly counters reset kar dega. Yeh action undo nahi ho sakta!')) return;
 
   try {
