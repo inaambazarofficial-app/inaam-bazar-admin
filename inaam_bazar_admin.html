@@ -1150,6 +1150,7 @@ async function checkExpiredWins() {
     const expired = snap.docs.filter(doc => {
       const d = doc.data();
       if (d.claimSubmitted === true) return false;
+      if (d.pendingCompletion === true) return false; // Live Draw hasn't run yet — not actually completed
       if (!d.winnerClaimDeadline) return false;
       const deadline = new Date(d.winnerClaimDeadline.seconds * 1000);
       return deadline < now;
