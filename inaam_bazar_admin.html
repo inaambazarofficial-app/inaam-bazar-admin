@@ -1699,7 +1699,9 @@ async function confirmWinner() {
       await db.collection('winners').doc(oldDoc.id).delete();
     }
 
-    const claimDeadline = new Date(Date.now() + 10 * 60000); // TESTING: 10 min instead of 2 days
+    // No deadline set here anymore — the claim window only starts once
+    // Live Draw actually reveals the winner (see LiveDrawScreen's
+    // _stopOnWinner), not at this private selection moment.
     await db.collection('draws').doc(currentDrawId).update({
       status: 'active',
       winnerId: selectedWinner.userId,
@@ -1707,7 +1709,6 @@ async function confirmWinner() {
       winnerCity: '',
       winnerEmail: selectedWinner.email || '',
       pendingCompletion: true,
-      winnerClaimDeadline: firebase.firestore.Timestamp.fromDate(claimDeadline),
       claimSubmitted: false,
     });
     const drawSnapForWinner = await db.collection('draws').doc(currentDrawId).get();
