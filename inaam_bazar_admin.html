@@ -1311,6 +1311,8 @@ async function approveProof(proofId, userId, type) {
     await db.collection('winner_proofs').doc(proofId).update({
       status: 'approved',
       approvedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      ticketsAwarded: reward,
+      rewardSeen: false,
     });
     await db.collection('users').doc(userId).update({
       tickets: firebase.firestore.FieldValue.increment(reward),
