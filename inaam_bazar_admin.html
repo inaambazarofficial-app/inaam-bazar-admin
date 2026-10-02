@@ -94,6 +94,16 @@
   .filter-tab.active { background: rgba(240,165,0,0.2); color: #F0A500; border-color: #F0A500; }
   .draw-compact { background: #16213E; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
   .draw-compact:hover { border-color: rgba(240,165,0,0.3); }
+
+  /* ── Top-level section tabs ───────────────────────────────────────── */
+  .tab-nav { display:flex; gap:8px; overflow-x:auto; padding:16px 24px 0; max-width:1000px; margin:0 auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
+  .tab-nav::-webkit-scrollbar { display:none; }
+  .tab-btn { flex-shrink:0; background:#16213E; color:#9E9E9E; border:1px solid rgba(240,165,0,0.2); padding:10px 18px; border-radius:10px 10px 0 0; font-size:13px; font-weight:bold; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:6px; transition:background 0.15s,color 0.15s; }
+  .tab-btn.active { background:rgba(240,165,0,0.18); color:#F0A500; border-color:#F0A500; border-bottom-color:transparent; }
+  .tab-panel { display:none; }
+  .tab-panel.active { display:block; }
+  .coming-soon-box { background:#16213E; border:1px dashed rgba(240,165,0,0.35); border-radius:12px; padding:40px 24px; text-align:center; color:#9E9E9E; }
+  .coming-soon-box .big-emoji { font-size:40px; margin-bottom:12px; }
 </style>
 </head>
 <body>
@@ -125,14 +135,78 @@
     <button class="logout-btn" onclick="signOut()">Logout</button>
   </div>
 
+  <!-- Tab navigation -->
+  <div class="tab-nav">
+    <button class="tab-btn active" id="tabBtn-dashboard" onclick="switchTab('dashboard')">📊 Dashboard</button>
+    <button class="tab-btn" id="tabBtn-draws" onclick="switchTab('draws')">🎯 Draws</button>
+    <button class="tab-btn" id="tabBtn-users" onclick="switchTab('users')">👥 Users</button>
+    <button class="tab-btn" id="tabBtn-claims" onclick="switchTab('claims')">🎁 Claims</button>
+    <button class="tab-btn" id="tabBtn-content" onclick="switchTab('content')">📢 Content</button>
+    <button class="tab-btn" id="tabBtn-notifications" onclick="switchTab('notifications')">🔔 Notifications</button>
+    <button class="tab-btn" id="tabBtn-settings" onclick="switchTab('settings')">⚙️ Settings</button>
+  </div>
+
   <div class="content">
-    <div style="display:flex;gap:12px;margin-bottom:24px;align-items:stretch;flex-wrap:wrap;">
-      <div class="stats-bar" style="flex:1;margin-bottom:0;min-width:280px;">
+
+    <!-- ═══════════════════════ TAB: DASHBOARD ═══════════════════════ -->
+    <div class="tab-panel active" id="tab-dashboard">
+      <div class="stats-bar">
         <div class="stat-card"><div class="stat-num" id="totalDraws">-</div><div class="stat-label">Total Draws</div></div>
         <div class="stat-card"><div class="stat-num" id="activeDraws">-</div><div class="stat-label">Active Draws</div></div>
         <div class="stat-card"><div class="stat-num" id="totalUsers">-</div><div class="stat-label">Total Users</div></div>
       </div>
-      <div style="width:220px;background:#16213E;border:1px solid rgba(142,68,173,0.4);border-radius:12px;padding:12px;flex-shrink:0;">
+    </div>
+
+    <!-- ═══════════════════════ TAB: DRAWS ═══════════════════════════ -->
+    <div class="tab-panel" id="tab-draws">
+
+      <div style="background:#16213E;border:1px solid rgba(231,76,60,0.5);border-radius:12px;padding:16px;margin-bottom:24px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+          <span style="font-size:15px;font-weight:bold;color:#E74C3C;">⚠️ Expired Unclaimed Wins</span>
+          <span id="expiredWinsCount" style="background:#E74C3C;padding:2px 10px;border-radius:12px;font-size:12px;color:white;">0</span>
+        </div>
+        <div id="expiredWinsList"><div class="loading" style="padding:16px;">Loading...</div></div>
+      </div>
+
+      <div style="background:#16213E;border:1px solid rgba(240,165,0,0.4);border-radius:12px;padding:16px;margin-bottom:24px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="toggleLeaderboardPanel()">
+          <span style="font-size:15px;font-weight:bold;color:#F0A500;">🏆 Weekly Leaderboard</span>
+          <span style="display:flex;align-items:center;gap:8px;">
+            <span id="leaderboardEnabledStatus" style="font-size:12px;color:#9E9E9E;">Loading...</span>
+            <span id="leaderboardToggleIcon" style="font-size:12px;color:#9E9E9E;">▶</span>
+          </span>
+        </div>
+        <div id="leaderboardPanelBody" style="display:none;margin-top:10px;">
+          <div id="leaderboardStatus" style="font-size:12px;color:#9E9E9E;margin-bottom:10px;">Loading...</div>
+          <div id="leaderboardCurrentStandings" style="margin-bottom:12px;font-size:13px;color:#9E9E9E;">Loading standings...</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn" style="background:#F0A500;color:#3D1F00;" onclick="runWeeklyLeaderboardReset()">🏆 Run Weekly Reset & Rewards</button>
+            <button class="btn" style="background:#27AE60;color:white;" onclick="enableLeaderboard()">✅ Enable Leaderboard</button>
+            <button class="btn" style="background:rgba(231,76,60,0.15);color:#E74C3C;border:1px solid rgba(231,76,60,0.4);" onclick="disableLeaderboard()">⏹️ Disable Leaderboard</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-title">
+        🎯 Draws Management
+        <button class="add-draw-btn" onclick="showAddDrawModal()">+ New Draw</button>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
+        <button class="filter-tab active" id="filterAll" onclick="setDrawFilter('all')">Sab</button>
+        <button class="filter-tab" id="filterActive" onclick="setDrawFilter('active')">🟢 Active</button>
+        <button class="filter-tab" id="filterPending" onclick="setDrawFilter('pending')">⏳ Pending</button>
+        <button class="filter-tab" id="filterCompleted" onclick="setDrawFilter('completed')">✅ Completed</button>
+        <input class="form-input" id="drawSearchInput" placeholder="🔍 Prize name search karo..." style="flex:1;min-width:180px;max-width:260px;padding:8px 12px;" oninput="renderDraws(allDrawsCache)">
+      </div>
+      <div id="drawsList"><div class="loading">Loading draws...</div></div>
+      <div id="loadMoreWrap" style="text-align:center;margin-top:16px;display:none;">
+        <button class="btn" style="background:rgba(240,165,0,0.15);color:#F0A500;border:1px solid rgba(240,165,0,0.4);" onclick="loadMoreDraws()">⬇️ Aur Dikhao</button>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════ TAB: USERS ════════════════════════════ -->
+    <div class="tab-panel" id="tab-users">
+      <div style="background:#16213E;border:1px solid rgba(142,68,173,0.4);border-radius:12px;padding:12px;margin-bottom:24px;">
         <div onclick="togglePendingSection()" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
           <span style="font-size:13px;font-weight:bold;color:#8E44AD;">🎁 Referrals</span>
           <span style="display:flex;align-items:center;gap:6px;">
@@ -144,206 +218,188 @@
       </div>
     </div>
 
-    <div style="background:#16213E;border:1px solid rgba(231,76,60,0.5);border-radius:12px;padding:16px;margin-bottom:24px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-        <span style="font-size:15px;font-weight:bold;color:#E74C3C;">⚠️ Expired Unclaimed Wins</span>
-        <span id="expiredWinsCount" style="background:#E74C3C;padding:2px 10px;border-radius:12px;font-size:12px;color:white;">0</span>
+    <!-- ═══════════════════════ TAB: CLAIMS ═══════════════════════════ -->
+    <div class="tab-panel" id="tab-claims">
+      <div class="section-title" style="cursor:pointer;" onclick="toggleProofsPanel(event)">
+        <span>📸 Winner Proof Submissions <span id="proofsPanelToggleIcon" style="font-size:12px;color:#9E9E9E;">▶</span></span>
+        <span id="proofsCount" style="background:#E74C3C;padding:2px 10px;border-radius:12px;font-size:12px;color:white;">0</span>
       </div>
-      <div id="expiredWinsList"><div class="loading" style="padding:16px;">Loading...</div></div>
-    </div>
-
-    <div style="background:#16213E;border:1px solid rgba(240,165,0,0.4);border-radius:12px;padding:16px;margin-bottom:24px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="toggleLeaderboardPanel()">
-        <span style="font-size:15px;font-weight:bold;color:#F0A500;">🏆 Weekly Leaderboard</span>
-        <span style="display:flex;align-items:center;gap:8px;">
-          <span id="leaderboardEnabledStatus" style="font-size:12px;color:#9E9E9E;">Loading...</span>
-          <span id="leaderboardToggleIcon" style="font-size:12px;color:#9E9E9E;">▶</span>
-        </span>
-      </div>
-      <div id="leaderboardPanelBody" style="display:none;margin-top:10px;">
-        <div id="leaderboardStatus" style="font-size:12px;color:#9E9E9E;margin-bottom:10px;">Loading...</div>
-        <div id="leaderboardCurrentStandings" style="margin-bottom:12px;font-size:13px;color:#9E9E9E;">Loading standings...</div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <button class="btn" style="background:#F0A500;color:#3D1F00;" onclick="runWeeklyLeaderboardReset()">🏆 Run Weekly Reset & Rewards</button>
-          <button class="btn" style="background:#27AE60;color:white;" onclick="enableLeaderboard()">✅ Enable Leaderboard</button>
-          <button class="btn" style="background:rgba(231,76,60,0.15);color:#E74C3C;border:1px solid rgba(231,76,60,0.4);" onclick="disableLeaderboard()">⏹️ Disable Leaderboard</button>
+      <div id="proofsPanelBody" style="display:none;">
+        <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+          <button class="filter-tab active" id="proofFilterPending" onclick="setProofFilter('pending')">⏳ Pending</button>
+          <button class="filter-tab" id="proofFilterApproved" onclick="setProofFilter('approved')">✅ Approved</button>
+          <button class="filter-tab" id="proofFilterRejected" onclick="setProofFilter('rejected')">❌ Rejected</button>
+          <button class="filter-tab" id="proofFilterAll" onclick="setProofFilter('all')">Sab</button>
         </div>
+        <div id="proofsList" style="margin-bottom:24px;"><div class="loading">Loading submissions...</div></div>
       </div>
-    </div>
 
-    <div style="background:#16213E;border:1px solid rgba(240,165,0,0.4);border-radius:12px;padding:16px;margin-bottom:24px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="toggleHappyHourPanel()">
-        <span style="font-size:15px;font-weight:bold;color:#F0A500;">⚡ Happy Hour</span>
-        <span style="display:flex;align-items:center;gap:8px;">
-          <span id="happyHourStatus" style="font-size:12px;color:#9E9E9E;">Loading...</span>
-          <span id="happyHourToggleIcon" style="font-size:12px;color:#9E9E9E;">▶</span>
-        </span>
+      <div class="section-title" style="cursor:pointer;" onclick="toggleClaimsPanel(event)">
+        <span>🎁 Pending Prize Claims <span id="claimsPanelToggleIcon" style="font-size:12px;color:#9E9E9E;">▶</span></span>
+        <span id="claimsCount" style="background:#E74C3C;padding:2px 10px;border-radius:12px;font-size:12px;color:white;">0</span>
       </div>
-      <div id="happyHourPanelBody" style="display:none;margin-top:10px;">
-        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-          <select class="form-input" id="happyHourMultiplier" style="width:100px;padding:8px;">
-            <option value="2">2x</option>
-            <option value="3">3x</option>
-          </select>
-          <select class="form-input" id="happyHourDuration" style="width:120px;padding:8px;">
-            <option value="30">30 min</option>
-            <option value="60" selected>60 min</option>
-            <option value="90">90 min</option>
-          </select>
-          <button class="btn" style="background:#F0A500;color:#3D1F00;" onclick="startHappyHour()">🚀 Start Happy Hour</button>
-          <button class="btn" style="background:rgba(231,76,60,0.15);color:#E74C3C;border:1px solid rgba(231,76,60,0.4);" onclick="stopHappyHour()">⏹️ Stop Now</button>
+      <div id="claimsPanelBody" style="display:none;">
+        <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+          <button class="filter-tab active" id="claimFilterPending" onclick="setClaimFilter('pending_info')">⏳ Pending</button>
+          <button class="filter-tab" id="claimFilterReviewing" onclick="setClaimFilter('reviewing')">🔍 Reviewing</button>
+          <button class="filter-tab" id="claimFilterVerified" onclick="setClaimFilter('verified')">✅ Verified</button>
+          <button class="filter-tab" id="claimFilterShipped" onclick="setClaimFilter('shipped')">📦 Shipped</button>
+          <button class="filter-tab" id="claimFilterCompleted" onclick="setClaimFilter('completed')">🎉 Completed</button>
+          <button class="filter-tab" id="claimFilterAll" onclick="setClaimFilter('all')">Sab</button>
         </div>
+        <div id="claimsList" style="margin-bottom:24px;"><div class="loading">Loading claims...</div></div>
       </div>
     </div>
 
-    <div style="background:#16213E;border:1px solid rgba(231,76,60,0.4);border-radius:12px;padding:16px;margin-bottom:24px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="toggleAnnouncementPanel()">
-        <span style="font-size:15px;font-weight:bold;color:#E74C3C;">📢 Announcement Banner</span>
-        <span style="display:flex;align-items:center;gap:8px;">
-          <span id="announcementStatus" style="font-size:12px;color:#9E9E9E;">Loading...</span>
-          <span id="announcementToggleIcon" style="font-size:12px;color:#9E9E9E;">▶</span>
-        </span>
-      </div>
-      <div id="announcementPanelBody" style="display:none;margin-top:10px;">
-        <div class="form-group" style="margin-bottom:10px;">
-          <input class="form-input" id="announcementText" placeholder="e.g. App maintenance kal 2 baje hogi" style="width:100%;">
+    <!-- ═══════════════════════ TAB: CONTENT ══════════════════════════ -->
+    <div class="tab-panel" id="tab-content">
+      <div style="background:#16213E;border:1px solid rgba(240,165,0,0.4);border-radius:12px;padding:16px;margin-bottom:24px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="toggleHappyHourPanel()">
+          <span style="font-size:15px;font-weight:bold;color:#F0A500;">⚡ Happy Hour</span>
+          <span style="display:flex;align-items:center;gap:8px;">
+            <span id="happyHourStatus" style="font-size:12px;color:#9E9E9E;">Loading...</span>
+            <span id="happyHourToggleIcon" style="font-size:12px;color:#9E9E9E;">▶</span>
+          </span>
         </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-          <select class="form-input" id="announcementSpeed" style="width:100px;padding:8px;">
-            <option value="1">1x Speed</option>
-            <option value="2">2x Speed</option>
-            <option value="3">3x Speed</option>
-          </select>
-          <select class="form-input" id="announcementDuration" style="width:130px;padding:8px;">
-            <option value="30">30 minutes</option>
-            <option value="60" selected>1 hour</option>
-            <option value="240">4 hours</option>
-            <option value="480">8 hours</option>
-            <option value="1440">24 hours</option>
-            <option value="forever">Forever</option>
-          </select>
-          <button class="btn" style="background:#E74C3C;color:white;" onclick="startAnnouncement()">📢 Show Banner</button>
-          <button class="btn" style="background:rgba(231,76,60,0.15);color:#E74C3C;border:1px solid rgba(231,76,60,0.4);" onclick="stopAnnouncement()">⏹️ Hide Banner</button>
-        </div>
-      </div>
-    </div>
-
-    <div style="background:#16213E;border:1px solid rgba(52,152,219,0.4);border-radius:12px;padding:16px;margin-bottom:24px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;cursor:pointer;" onclick="toggleQuizPanel()">
-        <span style="font-size:15px;font-weight:bold;color:#3498DB;">🧠 Quiz Questions</span>
-        <span style="display:flex;align-items:center;gap:8px;">
-          <span id="quizStatus" style="font-size:12px;color:#9E9E9E;">Loading...</span>
-          <span id="quizPanelToggleIcon" style="font-size:12px;color:#9E9E9E;">▶</span>
-        </span>
-      </div>
-
-      <div id="quizPanelBody" style="display:none;">
-      <div style="display:flex;gap:8px;margin-bottom:12px;">
-        <button class="filter-tab active" id="quizTabSingle" onclick="setQuizTab('single')">➕ Single</button>
-        <button class="filter-tab" id="quizTabBulk" onclick="setQuizTab('bulk')">📋 Bulk Import</button>
-        <button class="filter-tab" id="quizTabList" onclick="setQuizTab('list')">📄 View All</button>
-      </div>
-
-      <div id="quizSinglePanel">
-        <div class="form-group">
-          <label class="form-label">Question</label>
-          <input class="form-input" id="qSingleQuestion" placeholder="e.g. Pakistan ki rajdhani kya hai?">
-        </div>
-        <div class="form-row">
-          <div class="form-group"><label class="form-label">Option A</label><input class="form-input" id="qSingleOpt0" placeholder="Option A"></div>
-          <div class="form-group"><label class="form-label">Option B</label><input class="form-input" id="qSingleOpt1" placeholder="Option B"></div>
-        </div>
-        <div class="form-row">
-          <div class="form-group"><label class="form-label">Option C</label><input class="form-input" id="qSingleOpt2" placeholder="Option C"></div>
-          <div class="form-group"><label class="form-label">Option D</label><input class="form-input" id="qSingleOpt3" placeholder="Option D"></div>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Correct Answer</label>
-          <select class="form-input" id="qSingleCorrect">
-            <option value="0">Option A</option>
-            <option value="1">Option B</option>
-            <option value="2">Option C</option>
-            <option value="3">Option D</option>
-          </select>
-        </div>
-        <button class="submit-btn" onclick="addSingleQuestion()">➕ Question Add Karo</button>
-      </div>
-
-      <div id="quizBulkPanel" style="display:none;">
-        <div class="form-group">
-          <label class="form-label">Paste questions (one per line)</label>
-          <div style="font-size:11px;color:#9E9E9E;margin-bottom:8px;">
-            Format: <code>Question|Option A|Option B|Option C|Option D|CorrectIndex(0-3)</code><br>
-            Example: <code>Pakistan ki rajdhani kya hai?|Lahore|Karachi|Islamabad|Peshawar|2</code>
+        <div id="happyHourPanelBody" style="display:none;margin-top:10px;">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+            <select class="form-input" id="happyHourMultiplier" style="width:100px;padding:8px;">
+              <option value="2">2x</option>
+              <option value="3">3x</option>
+            </select>
+            <select class="form-input" id="happyHourDuration" style="width:120px;padding:8px;">
+              <option value="30">30 min</option>
+              <option value="60" selected>60 min</option>
+              <option value="90">90 min</option>
+            </select>
+            <button class="btn" style="background:#F0A500;color:#3D1F00;" onclick="startHappyHour()">🚀 Start Happy Hour</button>
+            <button class="btn" style="background:rgba(231,76,60,0.15);color:#E74C3C;border:1px solid rgba(231,76,60,0.4);" onclick="stopHappyHour()">⏹️ Stop Now</button>
           </div>
-          <textarea class="form-input" id="qBulkText" rows="10" style="font-family:monospace;font-size:12px;resize:vertical;" placeholder="Question1|OptA|OptB|OptC|OptD|2
+        </div>
+      </div>
+
+      <div style="background:#16213E;border:1px solid rgba(231,76,60,0.4);border-radius:12px;padding:16px;margin-bottom:24px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="toggleAnnouncementPanel()">
+          <span style="font-size:15px;font-weight:bold;color:#E74C3C;">📢 Announcement Banner</span>
+          <span style="display:flex;align-items:center;gap:8px;">
+            <span id="announcementStatus" style="font-size:12px;color:#9E9E9E;">Loading...</span>
+            <span id="announcementToggleIcon" style="font-size:12px;color:#9E9E9E;">▶</span>
+          </span>
+        </div>
+        <div id="announcementPanelBody" style="display:none;margin-top:10px;">
+          <div class="form-group" style="margin-bottom:10px;">
+            <input class="form-input" id="announcementText" placeholder="e.g. App maintenance kal 2 baje hogi" style="width:100%;">
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+            <select class="form-input" id="announcementSpeed" style="width:100px;padding:8px;">
+              <option value="1">1x Speed</option>
+              <option value="2">2x Speed</option>
+              <option value="3">3x Speed</option>
+            </select>
+            <select class="form-input" id="announcementDuration" style="width:130px;padding:8px;">
+              <option value="30">30 minutes</option>
+              <option value="60" selected>1 hour</option>
+              <option value="240">4 hours</option>
+              <option value="480">8 hours</option>
+              <option value="1440">24 hours</option>
+              <option value="forever">Forever</option>
+            </select>
+            <button class="btn" style="background:#E74C3C;color:white;" onclick="startAnnouncement()">📢 Show Banner</button>
+            <button class="btn" style="background:rgba(231,76,60,0.15);color:#E74C3C;border:1px solid rgba(231,76,60,0.4);" onclick="stopAnnouncement()">⏹️ Hide Banner</button>
+          </div>
+        </div>
+      </div>
+
+      <div style="background:#16213E;border:1px solid rgba(52,152,219,0.4);border-radius:12px;padding:16px;margin-bottom:24px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;cursor:pointer;" onclick="toggleQuizPanel()">
+          <span style="font-size:15px;font-weight:bold;color:#3498DB;">🧠 Quiz Questions</span>
+          <span style="display:flex;align-items:center;gap:8px;">
+            <span id="quizStatus" style="font-size:12px;color:#9E9E9E;">Loading...</span>
+            <span id="quizPanelToggleIcon" style="font-size:12px;color:#9E9E9E;">▶</span>
+          </span>
+        </div>
+
+        <div id="quizPanelBody" style="display:none;">
+        <div style="display:flex;gap:8px;margin-bottom:12px;">
+          <button class="filter-tab active" id="quizTabSingle" onclick="setQuizTab('single')">➕ Single</button>
+          <button class="filter-tab" id="quizTabBulk" onclick="setQuizTab('bulk')">📋 Bulk Import</button>
+          <button class="filter-tab" id="quizTabList" onclick="setQuizTab('list')">📄 View All</button>
+        </div>
+
+        <div id="quizSinglePanel">
+          <div class="form-group">
+            <label class="form-label">Question</label>
+            <input class="form-input" id="qSingleQuestion" placeholder="e.g. Pakistan ki rajdhani kya hai?">
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Option A</label><input class="form-input" id="qSingleOpt0" placeholder="Option A"></div>
+            <div class="form-group"><label class="form-label">Option B</label><input class="form-input" id="qSingleOpt1" placeholder="Option B"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Option C</label><input class="form-input" id="qSingleOpt2" placeholder="Option C"></div>
+            <div class="form-group"><label class="form-label">Option D</label><input class="form-input" id="qSingleOpt3" placeholder="Option D"></div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Correct Answer</label>
+            <select class="form-input" id="qSingleCorrect">
+              <option value="0">Option A</option>
+              <option value="1">Option B</option>
+              <option value="2">Option C</option>
+              <option value="3">Option D</option>
+            </select>
+          </div>
+          <button class="submit-btn" onclick="addSingleQuestion()">➕ Question Add Karo</button>
+        </div>
+
+        <div id="quizBulkPanel" style="display:none;">
+          <div class="form-group">
+            <label class="form-label">Paste questions (one per line)</label>
+            <div style="font-size:11px;color:#9E9E9E;margin-bottom:8px;">
+              Format: <code>Question|Option A|Option B|Option C|Option D|CorrectIndex(0-3)</code><br>
+              Example: <code>Pakistan ki rajdhani kya hai?|Lahore|Karachi|Islamabad|Peshawar|2</code>
+            </div>
+            <textarea class="form-input" id="qBulkText" rows="10" style="font-family:monospace;font-size:12px;resize:vertical;" placeholder="Question1|OptA|OptB|OptC|OptD|2
 Question2|OptA|OptB|OptC|OptD|0"></textarea>
+          </div>
+          <button class="submit-btn" onclick="addBulkQuestions()">📋 Bulk Import Karo</button>
         </div>
-        <button class="submit-btn" onclick="addBulkQuestions()">📋 Bulk Import Karo</button>
-      </div>
 
-      <div id="quizListPanel" style="display:none;">
-        <div style="display:flex;gap:8px;margin-bottom:10px;">
-          <input class="form-input" id="quizSearchInput" placeholder="🔍 Question search karo..." oninput="renderQuizList()">
+        <div id="quizListPanel" style="display:none;">
+          <div style="display:flex;gap:8px;margin-bottom:10px;">
+            <input class="form-input" id="quizSearchInput" placeholder="🔍 Question search karo..." oninput="renderQuizList()">
+          </div>
+          <div id="quizQuestionsList" style="max-height:400px;overflow-y:auto;"><div class="loading">Loading...</div></div>
         </div>
-        <div id="quizQuestionsList" style="max-height:400px;overflow-y:auto;"><div class="loading">Loading...</div></div>
+        </div>
       </div>
+
+      <div class="section-title" style="cursor:pointer;" onclick="togglePollsPanel(event)">
+        <span>🗳️ Polls Management <span id="pollsPanelToggleIcon" style="font-size:12px;color:#9E9E9E;">▶</span></span>
+        <button class="add-draw-btn" onclick="event.stopPropagation(); showAddPollModal()">+ New Poll</button>
+      </div>
+      <div id="pollsPanelBody" style="display:none;">
+      <div id="pollsList" style="margin-bottom:24px;"></div>
       </div>
     </div>
 
-    <div class="section-title" style="cursor:pointer;" onclick="toggleProofsPanel(event)">
-      <span>📸 Winner Proof Submissions <span id="proofsPanelToggleIcon" style="font-size:12px;color:#9E9E9E;">▶</span></span>
-      <span id="proofsCount" style="background:#E74C3C;padding:2px 10px;border-radius:12px;font-size:12px;color:white;">0</span>
-    </div>
-    <div id="proofsPanelBody" style="display:none;">
-      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
-        <button class="filter-tab active" id="proofFilterPending" onclick="setProofFilter('pending')">⏳ Pending</button>
-        <button class="filter-tab" id="proofFilterApproved" onclick="setProofFilter('approved')">✅ Approved</button>
-        <button class="filter-tab" id="proofFilterRejected" onclick="setProofFilter('rejected')">❌ Rejected</button>
-        <button class="filter-tab" id="proofFilterAll" onclick="setProofFilter('all')">Sab</button>
+    <!-- ═══════════════════════ TAB: NOTIFICATIONS ════════════════════ -->
+    <div class="tab-panel" id="tab-notifications">
+      <div class="coming-soon-box">
+        <div class="big-emoji">🔔</div>
+        <div style="font-weight:bold;color:#F0A500;margin-bottom:6px;">Notification Composer — Jald Aa Raha Hai</div>
+        <div style="font-size:13px;">Phase 5 mein build hoga — custom title/message bhej sakoge all users ya segments ko.</div>
       </div>
-      <div id="proofsList" style="margin-bottom:24px;"><div class="loading">Loading submissions...</div></div>
     </div>
 
-    <div class="section-title" style="cursor:pointer;" onclick="toggleClaimsPanel(event)">
-      <span>🎁 Pending Prize Claims <span id="claimsPanelToggleIcon" style="font-size:12px;color:#9E9E9E;">▶</span></span>
-      <span id="claimsCount" style="background:#E74C3C;padding:2px 10px;border-radius:12px;font-size:12px;color:white;">0</span>
-    </div>
-    <div id="claimsPanelBody" style="display:none;">
-      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
-        <button class="filter-tab active" id="claimFilterPending" onclick="setClaimFilter('pending_info')">⏳ Pending</button>
-        <button class="filter-tab" id="claimFilterReviewing" onclick="setClaimFilter('reviewing')">🔍 Reviewing</button>
-        <button class="filter-tab" id="claimFilterVerified" onclick="setClaimFilter('verified')">✅ Verified</button>
-        <button class="filter-tab" id="claimFilterShipped" onclick="setClaimFilter('shipped')">📦 Shipped</button>
-        <button class="filter-tab" id="claimFilterCompleted" onclick="setClaimFilter('completed')">🎉 Completed</button>
-        <button class="filter-tab" id="claimFilterAll" onclick="setClaimFilter('all')">Sab</button>
+    <!-- ═══════════════════════ TAB: SETTINGS ═════════════════════════ -->
+    <div class="tab-panel" id="tab-settings">
+      <div class="coming-soon-box">
+        <div class="big-emoji">⚙️</div>
+        <div style="font-weight:bold;color:#F0A500;margin-bottom:6px;">Emergency Controls — Jald Aa Raha Hai</div>
+        <div style="font-size:13px;">Phase 1 mein build hoga — maintenance mode aur per-game on/off switches.</div>
       </div>
-      <div id="claimsList" style="margin-bottom:24px;"><div class="loading">Loading claims...</div></div>
     </div>
 
-    <div class="section-title" style="cursor:pointer;" onclick="togglePollsPanel(event)">
-      <span>🗳️ Polls Management <span id="pollsPanelToggleIcon" style="font-size:12px;color:#9E9E9E;">▶</span></span>
-      <button class="add-draw-btn" onclick="event.stopPropagation(); showAddPollModal()">+ New Poll</button>
-    </div>
-    <div id="pollsPanelBody" style="display:none;">
-    <div id="pollsList" style="margin-bottom:24px;"></div>
-    </div>
-
-    <div class="section-title">
-      🎯 Draws Management
-      <button class="add-draw-btn" onclick="showAddDrawModal()">+ New Draw</button>
-    </div>
-    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
-      <button class="filter-tab active" id="filterAll" onclick="setDrawFilter('all')">Sab</button>
-      <button class="filter-tab" id="filterActive" onclick="setDrawFilter('active')">🟢 Active</button>
-      <button class="filter-tab" id="filterPending" onclick="setDrawFilter('pending')">⏳ Pending</button>
-      <button class="filter-tab" id="filterCompleted" onclick="setDrawFilter('completed')">✅ Completed</button>
-      <input class="form-input" id="drawSearchInput" placeholder="🔍 Prize name search karo..." style="flex:1;min-width:180px;max-width:260px;padding:8px 12px;" oninput="renderDraws(allDrawsCache)">
-    </div>
-    <div id="drawsList"><div class="loading">Loading draws...</div></div>
-    <div id="loadMoreWrap" style="text-align:center;margin-top:16px;display:none;">
-      <button class="btn" style="background:rgba(240,165,0,0.15);color:#F0A500;border:1px solid rgba(240,165,0,0.4);" onclick="loadMoreDraws()">⬇️ Aur Dikhao</button>
-    </div>
   </div>
 </div>
 
@@ -596,6 +652,14 @@ const db = firebase.firestore();
 let currentDrawId = null;
 let currentEntries = [];
 let selectedWinner = null;
+
+// ── Tab navigation ──────────────────────────────────────────────────────────
+function switchTab(tabName) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + tabName).classList.add('active');
+  document.getElementById('tabBtn-' + tabName).classList.add('active');
+}
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 function signInWithGoogle() {
