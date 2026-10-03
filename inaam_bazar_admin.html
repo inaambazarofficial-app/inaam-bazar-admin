@@ -168,25 +168,6 @@
         <div id="expiredWinsList"><div class="loading" style="padding:16px;">Loading...</div></div>
       </div>
 
-      <div style="background:#16213E;border:1px solid rgba(240,165,0,0.4);border-radius:12px;padding:16px;margin-bottom:24px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="toggleLeaderboardPanel()">
-          <span style="font-size:15px;font-weight:bold;color:#F0A500;">🏆 Weekly Leaderboard</span>
-          <span style="display:flex;align-items:center;gap:8px;">
-            <span id="leaderboardEnabledStatus" style="font-size:12px;color:#9E9E9E;">Loading...</span>
-            <span id="leaderboardToggleIcon" style="font-size:12px;color:#9E9E9E;">▶</span>
-          </span>
-        </div>
-        <div id="leaderboardPanelBody" style="display:none;margin-top:10px;">
-          <div id="leaderboardStatus" style="font-size:12px;color:#9E9E9E;margin-bottom:10px;">Loading...</div>
-          <div id="leaderboardCurrentStandings" style="margin-bottom:12px;font-size:13px;color:#9E9E9E;">Loading standings...</div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;">
-            <button class="btn" style="background:#F0A500;color:#3D1F00;" onclick="runWeeklyLeaderboardReset()">🏆 Run Weekly Reset & Rewards</button>
-            <button class="btn" style="background:#27AE60;color:white;" onclick="enableLeaderboard()">✅ Enable Leaderboard</button>
-            <button class="btn" style="background:rgba(231,76,60,0.15);color:#E74C3C;border:1px solid rgba(231,76,60,0.4);" onclick="disableLeaderboard()">⏹️ Disable Leaderboard</button>
-          </div>
-        </div>
-      </div>
-
       <div class="section-title">
         🎯 Draws Management
         <button class="add-draw-btn" onclick="showAddDrawModal()">+ New Draw</button>
@@ -253,6 +234,25 @@
 
     <!-- ═══════════════════════ TAB: CONTENT ══════════════════════════ -->
     <div class="tab-panel" id="tab-content">
+      <div style="background:#16213E;border:1px solid rgba(240,165,0,0.4);border-radius:12px;padding:16px;margin-bottom:24px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="toggleLeaderboardPanel()">
+          <span style="font-size:15px;font-weight:bold;color:#F0A500;">🏆 Weekly Leaderboard</span>
+          <span style="display:flex;align-items:center;gap:8px;">
+            <span id="leaderboardEnabledStatus" style="font-size:12px;color:#9E9E9E;">Loading...</span>
+            <span id="leaderboardToggleIcon" style="font-size:12px;color:#9E9E9E;">▶</span>
+          </span>
+        </div>
+        <div id="leaderboardPanelBody" style="display:none;margin-top:10px;">
+          <div id="leaderboardStatus" style="font-size:12px;color:#9E9E9E;margin-bottom:10px;">Loading...</div>
+          <div id="leaderboardCurrentStandings" style="margin-bottom:12px;font-size:13px;color:#9E9E9E;">Loading standings...</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn" style="background:#F0A500;color:#3D1F00;" onclick="runWeeklyLeaderboardReset()">🏆 Run Weekly Reset & Rewards</button>
+            <button class="btn" style="background:#27AE60;color:white;" onclick="enableLeaderboard()">✅ Enable Leaderboard</button>
+            <button class="btn" style="background:rgba(231,76,60,0.15);color:#E74C3C;border:1px solid rgba(231,76,60,0.4);" onclick="disableLeaderboard()">⏹️ Disable Leaderboard</button>
+          </div>
+        </div>
+      </div>
+
       <div style="background:#16213E;border:1px solid rgba(240,165,0,0.4);border-radius:12px;padding:16px;margin-bottom:24px;">
         <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="toggleHappyHourPanel()">
           <span style="font-size:15px;font-weight:bold;color:#F0A500;">⚡ Happy Hour</span>
