@@ -187,6 +187,17 @@
 
     <!-- ═══════════════════════ TAB: USERS ════════════════════════════ -->
     <div class="tab-panel" id="tab-users">
+      <div style="background:#16213E;border:1px solid rgba(231,76,60,0.4);border-radius:12px;padding:16px;margin-bottom:24px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="toggleSuspiciousPanel()">
+          <span style="font-size:15px;font-weight:bold;color:#E74C3C;">🕵️ Suspicious Activity</span>
+          <span id="suspiciousToggleIcon" style="font-size:12px;color:#9E9E9E;">▶</span>
+        </div>
+        <div id="suspiciousPanelBody" style="display:none;margin-top:10px;">
+          <div style="font-size:12px;color:#9E9E9E;margin-bottom:10px;">Top earners, referrers aur ad watchers ko check karta hai. Yeh sirf hints hain, ban karne se pehle khud check karo.</div>
+          <button class="btn" style="background:#E74C3C;color:white;" onclick="runSuspiciousScan()">🔍 Scan Karo</button>
+          <div id="suspiciousResults" style="margin-top:12px;"></div>
+        </div>
+      </div>
       <div style="background:#16213E;border:1px solid rgba(52,152,219,0.4);border-radius:12px;padding:16px;margin-bottom:24px;">
         <div style="font-size:15px;font-weight:bold;color:#3498DB;margin-bottom:10px;">🔍 User Lookup</div>
         <div style="display:flex;gap:8px;margin-bottom:6px;">
@@ -2268,6 +2279,103 @@ async function deleteDraw(drawId, name) {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 // ── User Lookup ──────────────────────────────────────────────────────────────
+// ── Suspicious Activity (read-only scan) ─────────────────────────────────────
+// Starting-point thresholds. Tune these once you see your real numbers.
+const SUS_WEEKLY_TICKETS = 300;      // tickets earned this week
+const SUS_NEW_ACCOUNT_DAYS = 3;      // "new account" = younger than this
+const SUS_NEW_ACCOUNT_TICKETS = 200; // ...and already holding this many tickets
+const SUS_REFERRALS = 5;             // total referrals
+const SUS_ADS_PER_DAY = 8;           // average ads watched per day of account age
+
+let suspiciousPanelOpen = false;
+
+function toggleSuspiciousPanel() {
+  suspiciousPanelOpen = !suspiciousPanelOpen;
+  document.getElementById('suspiciousPanelBody').style.display = suspiciousPanelOpen ? 'block' : 'none';
+  document.getElementById('suspiciousToggleIcon').textContent = suspiciousPanelOpen ? '▼' : '▶';
+}
+
+function tsToMs(ts) {
+  if (!ts) return null;
+  if (ts.seconds) return ts.seconds * 1000;
+  if (ts.toDate) return ts.toDate().getTime();
+  return null;
+}
+
+async function runSuspiciousScan() {
+  const box = document.getElementById('suspiciousResults');
+  box.innerHTML = '<div class="loading" style="padding:16px;">Scan ho raha hai...</div>';
+  try {
+    const top = (field, n) => db.collection('users').orderBy(field, 'desc').limit(n).get();
+    const snaps = await Promise.all([
+      top('weeklyTicketsEarned', 25),
+      top('tickets', 25),
+      top('totalReferrals', 25),
+      top('totalAdsWatched', 25),
+      top('createdAt', 50),
+    ]);
+    const users = {};
+    snaps.forEach(s => s.docs.forEach(d => { users[d.id] = { id: d.id, ...d.data() }; }));
+
+    const now = Date.now();
+    const flagged = [];
+    Object.values(users).forEach(u => {
+      const flags = [];
+      const createdMs = tsToMs(u.createdAt);
+      const ageDays = createdMs ? (now - createdMs) / 86400000 : null;
+      const adsPerDay = ageDays !== null ? (u.totalAdsWatched || 0) / Math.max(ageDays, 1) : 0;
+
+      if ((u.weeklyTicketsEarned || 0) >= SUS_WEEKLY_TICKETS)
+        flags.push(`Is hafte ${u.weeklyTicketsEarned} tickets kamaye`);
+      if (ageDays !== null && ageDays <= SUS_NEW_ACCOUNT_DAYS && (u.tickets || 0) >= SUS_NEW_ACCOUNT_TICKETS)
+        flags.push(`Naya account (${Math.max(1, Math.ceil(ageDays))} din) mein ${u.tickets} tickets`);
+      if ((u.totalReferrals || 0) >= SUS_REFERRALS)
+        flags.push(`${u.totalReferrals} referrals`);
+      if (adsPerDay > SUS_ADS_PER_DAY)
+        flags.push(`Roz ke ~${adsPerDay.toFixed(1)} ads`);
+
+      if (flags.length) flagged.push({ u, flags });
+    });
+
+    flagged.sort((a, b) =>
+      b.flags.length - a.flags.length ||
+      (b.u.weeklyTicketsEarned || 0) - (a.u.weeklyTicketsEarned || 0));
+
+    const total = Object.keys(users).length;
+    if (flagged.length === 0) {
+      box.innerHTML = `<div class="loading" style="padding:16px;">✅ ${total} users check kiye, koi suspicious activity nahi mili.</div>`;
+      return;
+    }
+
+    box.innerHTML =
+      `<div style="font-size:12px;color:#9E9E9E;margin-bottom:10px;">${total} users check kiye • ${flagged.length} flagged</div>` +
+      flagged.map(({ u, flags }) => `
+        <div class="draw-card" style="border-color:rgba(231,76,60,0.4);">
+          <div class="draw-card-header">
+            <div class="draw-info">
+              <div class="draw-name">${escHtml(u.name || 'User')} ${u.isBanned ? '🚫' : ''}</div>
+              <div class="draw-desc">${escHtml(u.email || '-')}</div>
+            </div>
+            <span class="status-badge" style="background:rgba(231,76,60,0.2);color:#E74C3C;border:1px solid rgba(231,76,60,0.4);">${flags.length} flag${flags.length > 1 ? 's' : ''}</span>
+          </div>
+          <div style="margin-bottom:10px;">
+            ${flags.map(f => `<div style="font-size:12px;color:#F0A500;margin-bottom:3px;">⚠️ ${escHtml(f)}</div>`).join('')}
+          </div>
+          <div class="draw-desc" style="margin-bottom:10px;">Tickets: ${u.tickets || 0} • Is hafte: ${u.weeklyTicketsEarned || 0} • Referrals: ${u.totalReferrals || 0} • Ads: ${u.totalAdsWatched || 0}</div>
+          <button class="btn btn-entries" onclick="openUserInLookup('${escHtml(u.id)}')">🔎 Lookup Mein Kholo</button>
+        </div>`).join('');
+  } catch(e) {
+    box.innerHTML = '<div class="loading">Error: ' + e.message + '</div>';
+  }
+}
+
+function openUserInLookup(uid) {
+  const input = document.getElementById('userSearchInput');
+  input.value = uid;
+  searchUsers();
+  input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
 let userSearchCache = {};
 
 function escHtml(s) {
