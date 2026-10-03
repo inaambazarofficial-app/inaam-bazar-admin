@@ -187,6 +187,15 @@
 
     <!-- ═══════════════════════ TAB: USERS ════════════════════════════ -->
     <div class="tab-panel" id="tab-users">
+      <div style="background:#16213E;border:1px solid rgba(52,152,219,0.4);border-radius:12px;padding:16px;margin-bottom:24px;">
+        <div style="font-size:15px;font-weight:bold;color:#3498DB;margin-bottom:10px;">🔍 User Lookup</div>
+        <div style="display:flex;gap:8px;margin-bottom:6px;">
+          <input class="form-input" id="userSearchInput" placeholder="Email, naam, referral code ya UID..." onkeydown="if(event.key==='Enter') searchUsers()">
+          <button class="btn" style="background:#3498DB;color:white;" onclick="searchUsers()">Search</button>
+        </div>
+        <div style="font-size:11px;color:#9E9E9E;margin-bottom:12px;">Email poora likhna hoga. Naam ka shuruaati hissa likho, bilkul waise hi (capital/small letters) jaise profile mein hai.</div>
+        <div id="userSearchResults"></div>
+      </div>
       <div style="background:#16213E;border:1px solid rgba(142,68,173,0.4);border-radius:12px;padding:12px;margin-bottom:24px;">
         <div onclick="togglePendingSection()" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
           <span style="font-size:13px;font-weight:bold;color:#8E44AD;">🎁 Referrals</span>
@@ -2258,6 +2267,145 @@ async function deleteDraw(drawId, name) {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+// ── User Lookup ──────────────────────────────────────────────────────────────
+let userSearchCache = {};
+
+function escHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+async function searchUsers() {
+  const term = document.getElementById('userSearchInput').value.trim();
+  const box = document.getElementById('userSearchResults');
+  if (!term) { showToast('❌ Pehle kuch likho!', true); return; }
+  box.innerHTML = '<div class="loading" style="padding:16px;">Searching...</div>';
+
+  const found = {};
+  const add = (snap) => snap.docs.forEach(d => { found[d.id] = { id: d.id, ...d.data() }; });
+  const jobs = [
+    term.includes('/') ? Promise.resolve() :
+      db.collection('users').doc(term).get().then(d => { if (d.exists) found[d.id] = { id: d.id, ...d.data() }; }),
+    db.collection('users').where('email', '==', term).limit(5).get().then(add),
+    db.collection('users').where('email', '==', term.toLowerCase()).limit(5).get().then(add),
+    db.collection('users').where('referralCode', '==', term.toUpperCase()).limit(5).get().then(add),
+    db.collection('users').where('name', '>=', term).where('name', '<=', term + '\uf8ff').limit(10).get().then(add),
+  ].map(p => p.catch(() => {}));
+  await Promise.all(jobs);
+
+  userSearchCache = found;
+  renderUserResults();
+}
+
+function renderUserResults() {
+  const box = document.getElementById('userSearchResults');
+  const users = Object.values(userSearchCache);
+  if (users.length === 0) {
+    box.innerHTML = '<div class="loading" style="padding:16px;">Koi user nahi mila.</div>';
+    return;
+  }
+  const fmt = (ts) => ts && ts.seconds ? new Date(ts.seconds * 1000).toLocaleString('en-PK') : '-';
+  box.innerHTML = users.map(u => {
+    const banned = u.isBanned === true;
+    return `
+      <div class="draw-card" style="${banned ? 'border-color:rgba(231,76,60,0.6);' : ''}">
+        <div class="draw-card-header">
+          <div class="draw-info">
+            <div class="draw-name">${escHtml(u.name || 'User')}</div>
+            <div class="draw-desc">${escHtml(u.email || '-')}</div>
+            <div class="draw-desc" style="font-size:11px;word-break:break-all;">UID: ${escHtml(u.id)}</div>
+          </div>
+          <span class="status-badge ${banned ? '' : 'status-active'}" style="${banned ? 'background:rgba(231,76,60,0.2);color:#E74C3C;border:1px solid rgba(231,76,60,0.4);' : ''}">${banned ? '🚫 Banned' : '🟢 Active'}</span>
+        </div>
+        <div class="draw-stats">
+          <div class="draw-stat"><div class="draw-stat-num">${u.tickets || 0}</div><div class="draw-stat-label">Tickets</div></div>
+          <div class="draw-stat"><div class="draw-stat-num">${u.weeklyTicketsEarned || 0}</div><div class="draw-stat-label">Is Hafte Kamaye</div></div>
+          <div class="draw-stat"><div class="draw-stat-num">${u.totalWins || 0}</div><div class="draw-stat-label">Wins</div></div>
+          <div class="draw-stat"><div class="draw-stat-num">${u.totalDrawsEntered || 0}</div><div class="draw-stat-label">Entries</div></div>
+          <div class="draw-stat"><div class="draw-stat-num">${u.totalReferrals || 0}</div><div class="draw-stat-label">Referrals</div></div>
+          <div class="draw-stat"><div class="draw-stat-num">${u.streak || 0}</div><div class="draw-stat-label">Streak</div></div>
+        </div>
+        <div class="draw-desc" style="margin-bottom:12px;">Joined: ${fmt(u.createdAt)} • Last login: ${fmt(u.lastLogin)}</div>
+        <div class="draw-actions">
+          <button class="btn btn-entries" onclick="adjustUserTickets('${escHtml(u.id)}')">🎟️ Tickets Adjust</button>
+          <button class="btn" style="background:rgba(52,152,219,0.2);color:#3498DB;border:1px solid rgba(52,152,219,0.4);" onclick="viewUserHistory('${escHtml(u.id)}')">📜 History</button>
+          ${banned
+            ? `<button class="btn" style="background:#27AE60;color:white;" onclick="setUserBan('${escHtml(u.id)}', false)">✅ Unban</button>`
+            : `<button class="btn btn-delete" onclick="setUserBan('${escHtml(u.id)}', true)">🚫 Ban Karo</button>`}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function setUserBan(uid, ban) {
+  const u = userSearchCache[uid];
+  if (!u) return;
+  const question = ban
+    ? `${u.name || 'Is user'} ko BAN karna chahte hain? Unki app band ho jayegi.`
+    : `${u.name || 'Is user'} ko unban karna chahte hain?`;
+  if (!confirm(question)) return;
+  try {
+    await db.collection('users').doc(uid).update({
+      isBanned: ban,
+      bannedAt: ban ? firebase.firestore.FieldValue.serverTimestamp() : firebase.firestore.FieldValue.delete(),
+    });
+    userSearchCache[uid].isBanned = ban;
+    showToast(ban ? '🚫 User ban ho gaya' : '✅ User unban ho gaya', false);
+    renderUserResults();
+  } catch(e) { showToast('❌ Error: ' + e.message, true); }
+}
+
+async function adjustUserTickets(uid) {
+  const u = userSearchCache[uid];
+  if (!u) return;
+  const input = prompt(`${u.name || 'User'} ke abhi ${u.tickets || 0} tickets hain.\nKitne add ya minus karne hain? (e.g. 50 ya -20)`);
+  if (input === null) return;
+  const amount = parseInt(input, 10);
+  if (isNaN(amount) || amount === 0) { showToast('❌ Sahi number likho (e.g. 50 ya -20)', true); return; }
+  if ((u.tickets || 0) + amount < 0) { showToast('❌ Tickets zero se neeche nahi ja sakte', true); return; }
+  const reason = prompt('Wajah likho (log mein save hogi):', 'Admin adjustment');
+  if (reason === null) return;
+  if (!confirm(`${u.name || 'User'}: ${amount > 0 ? '+' : ''}${amount} tickets.\nWajah: ${reason}\n\nConfirm karein?`)) return;
+  try {
+    await db.collection('users').doc(uid).update({
+      tickets: firebase.firestore.FieldValue.increment(amount),
+    });
+    await db.collection('tickets_log').add({
+      userId: uid,
+      amount: amount,
+      type: amount > 0 ? 'credit' : 'debit',
+      reason: 'Admin: ' + (reason.trim() || 'adjustment'),
+      timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    userSearchCache[uid].tickets = (u.tickets || 0) + amount;
+    showToast('✅ Tickets update ho gaye', false);
+    renderUserResults();
+  } catch(e) { showToast('❌ Error: ' + e.message, true); }
+}
+
+async function viewUserHistory(uid) {
+  const u = userSearchCache[uid];
+  document.getElementById('entriesModalTitle').textContent = '📜 ' + ((u && u.name) || 'User') + ' — Ticket History';
+  document.getElementById('entriesList').innerHTML = '<div class="loading">Loading...</div>';
+  document.getElementById('entriesModal').classList.add('show');
+  try {
+    const snap = await db.collection('tickets_log').where('userId', '==', uid).get();
+    const rows = snap.docs.map(d => d.data())
+      .sort((a, b) => ((b.timestamp && b.timestamp.seconds) || 0) - ((a.timestamp && a.timestamp.seconds) || 0))
+      .slice(0, 25);
+    if (rows.length === 0) {
+      document.getElementById('entriesList').innerHTML = '<div class="loading">Koi history nahi mili.</div>';
+      return;
+    }
+    document.getElementById('entriesList').innerHTML = rows.map(r => {
+      const amt = r.amount || 0;
+      const ts = r.timestamp && r.timestamp.seconds ? new Date(r.timestamp.seconds * 1000).toLocaleString('en-PK') : '';
+      return `<div class="entry-item"><div><div class="entry-user">${escHtml(r.reason || '-')}</div><div class="entry-detail">${ts}</div></div><div class="entry-tickets" style="color:${amt >= 0 ? '#27AE60' : '#E74C3C'};">${amt > 0 ? '+' : ''}${amt}</div></div>`;
+    }).join('');
+  } catch(e) {
+    document.getElementById('entriesList').innerHTML = '<div class="loading">Error: ' + e.message + '</div>';
+  }
+}
+
 // ── App Controls (maintenance + per-game switches) ───────────────────────────
 const GAME_CONTROLS = [
   { key: 'spin', label: 'Lucky Spin', emoji: '🎡' },
