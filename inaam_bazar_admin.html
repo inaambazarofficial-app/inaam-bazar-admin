@@ -393,11 +393,23 @@ Question2|OptA|OptB|OptC|OptD|0"></textarea>
 
     <!-- ═══════════════════════ TAB: SETTINGS ═════════════════════════ -->
     <div class="tab-panel" id="tab-settings">
-      <div class="coming-soon-box">
-        <div class="big-emoji">⚙️</div>
-        <div style="font-weight:bold;color:#F0A500;margin-bottom:6px;">Emergency Controls — Jald Aa Raha Hai</div>
-        <div style="font-size:13px;">Phase 1 mein build hoga — maintenance mode aur per-game on/off switches.</div>
+
+      <div style="background:#16213E;border:1px solid rgba(231,76,60,0.5);border-radius:12px;padding:16px;margin-bottom:24px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+          <span style="font-size:15px;font-weight:bold;color:#E74C3C;">🚧 Maintenance Mode</span>
+          <span id="maintenanceStatus" style="font-size:12px;color:#9E9E9E;">Loading...</span>
+        </div>
+        <div style="font-size:12px;color:#9E9E9E;margin-bottom:10px;">On karne par poori app users ke liye band ho jayegi aur yeh message dikhega.</div>
+        <input class="form-input" id="maintenanceMessage" placeholder="App maintenance ho rahi hai. Thodi der baad try karein." style="margin-bottom:10px;">
+        <button class="btn" id="maintenanceToggleBtn" onclick="toggleMaintenance()">-</button>
       </div>
+
+      <div style="background:#16213E;border:1px solid rgba(240,165,0,0.4);border-radius:12px;padding:16px;margin-bottom:24px;">
+        <div style="font-size:15px;font-weight:bold;color:#F0A500;margin-bottom:4px;">🎮 Game Switches</div>
+        <div style="font-size:12px;color:#9E9E9E;margin-bottom:12px;">Band kiya hua game users ko grayed-out dikhega "Maintenance ho rahi hai" ke saath.</div>
+        <div id="gameControlsList"><div class="loading" style="padding:16px;">Loading...</div></div>
+      </div>
+
     </div>
 
   </div>
@@ -1553,6 +1565,7 @@ async function loadDashboard() {
     loadProofs();
     checkExpiredWins();
     checkLeaderboardStatus();
+    loadAppControls();
     loadPolls(); // loads count only unless expanded
   } catch(e) {
     document.getElementById('drawsList').innerHTML = '<div class="loading">Error loading. Check Firestore rules.</div>';
@@ -2245,6 +2258,88 @@ async function deleteDraw(drawId, name) {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+// ── App Controls (maintenance + per-game switches) ───────────────────────────
+const GAME_CONTROLS = [
+  { key: 'spin', label: 'Lucky Spin', emoji: '🎡' },
+  { key: 'scratch', label: 'Scratch Card', emoji: '🎫' },
+  { key: 'tbird', label: 'T-Bird', emoji: '🐦' },
+  { key: 'plinko', label: 'Ticket Drop', emoji: '🎯' },
+  { key: 'quiz', label: 'Daily Quiz', emoji: '🧠' },
+];
+let appControlsCache = { maintenanceMode: false, maintenanceMessage: '', games: {} };
+
+async function loadAppControls() {
+  try {
+    const doc = await db.collection('config').doc('app_controls').get();
+    const data = doc.exists ? doc.data() : {};
+    appControlsCache = {
+      maintenanceMode: data.maintenanceMode === true,
+      maintenanceMessage: data.maintenanceMessage || '',
+      games: data.games || {},
+    };
+    renderAppControls();
+  } catch(e) {
+    document.getElementById('gameControlsList').innerHTML = '<div class="loading">Error: ' + e.message + '</div>';
+  }
+}
+
+function renderAppControls() {
+  const on = appControlsCache.maintenanceMode;
+  const statusEl = document.getElementById('maintenanceStatus');
+  statusEl.textContent = on ? '🔴 ON — app band hai' : '🟢 OFF — app normal hai';
+  statusEl.style.color = on ? '#E74C3C' : '#27AE60';
+  document.getElementById('maintenanceMessage').value = appControlsCache.maintenanceMessage;
+  const btn = document.getElementById('maintenanceToggleBtn');
+  btn.textContent = on ? '✅ Maintenance Band Karo (App Wapas Chalu)' : '🚧 Maintenance Shuru Karo';
+  btn.style.background = on ? '#27AE60' : '#E74C3C';
+  btn.style.color = 'white';
+
+  document.getElementById('gameControlsList').innerHTML = GAME_CONTROLS.map(g => {
+    const enabled = appControlsCache.games[g.key] !== false;
+    return `
+      <div class="entry-item">
+        <div class="entry-user">${g.emoji} ${g.label}</div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-size:12px;font-weight:bold;color:${enabled ? '#27AE60' : '#E74C3C'};">${enabled ? '🟢 Chalu' : '🔴 Band'}</span>
+          <button class="btn" style="padding:6px 12px;font-size:12px;background:${enabled ? 'rgba(231,76,60,0.15)' : '#27AE60'};color:${enabled ? '#E74C3C' : 'white'};border:1px solid ${enabled ? 'rgba(231,76,60,0.4)' : '#27AE60'};" onclick="toggleGame('${g.key}')">${enabled ? 'Band Karo' : 'Chalu Karo'}</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function toggleMaintenance() {
+  const turningOn = !appControlsCache.maintenanceMode;
+  const message = document.getElementById('maintenanceMessage').value.trim() ||
+    'App maintenance ho rahi hai. Thodi der baad dobara try karein.';
+  const question = turningOn
+    ? 'Maintenance mode ON karna chahte hain? Sab users ke liye poori app band ho jayegi!'
+    : 'Maintenance mode band karke app wapas chalu karein?';
+  if (!confirm(question)) return;
+  try {
+    await db.collection('config').doc('app_controls').set({
+      maintenanceMode: turningOn,
+      maintenanceMessage: message,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+    showToast(turningOn ? '🚧 Maintenance mode ON' : '✅ App wapas chalu', false);
+    loadAppControls();
+  } catch(e) { showToast('❌ Error: ' + e.message, true); }
+}
+
+async function toggleGame(key) {
+  const game = GAME_CONTROLS.find(g => g.key === key);
+  const enabled = appControlsCache.games[key] !== false;
+  if (enabled && !confirm(`${game.label} band karna chahte hain? Users ko "Maintenance ho rahi hai" dikhega.`)) return;
+  try {
+    await db.collection('config').doc('app_controls').set({
+      games: { [key]: !enabled },
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+    showToast(enabled ? `🔴 ${game.label} band` : `🟢 ${game.label} chalu`, false);
+    loadAppControls();
+  } catch(e) { showToast('❌ Error: ' + e.message, true); }
+}
+
 function closeModal(id) { document.getElementById(id).classList.remove('show'); }
 function showToast(msg, isError) {
   const t = document.getElementById('toast');
