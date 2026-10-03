@@ -23,7 +23,7 @@
   .logout-btn { background: rgba(255,255,255,0.15); color: white; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 13px; }
   .logout-btn:hover { background: rgba(255,255,255,0.25); }
   .content { padding: 24px; max-width: 1000px; margin: 0 auto; }
-  .stats-bar { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 24px; }
+  .stats-bar { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 24px; }
   .stat-card { background: #16213E; border: 1px solid rgba(240,165,0,0.3); border-radius: 12px; padding: 16px; text-align: center; }
   .stat-num { font-size: 28px; font-weight: bold; color: #F5C518; }
   .stat-label { font-size: 12px; color: #9E9E9E; margin-top: 4px; }
@@ -154,6 +154,10 @@
         <div class="stat-card"><div class="stat-num" id="totalDraws">-</div><div class="stat-label">Total Draws</div></div>
         <div class="stat-card"><div class="stat-num" id="activeDraws">-</div><div class="stat-label">Active Draws</div></div>
         <div class="stat-card"><div class="stat-num" id="totalUsers">-</div><div class="stat-label">Total Users</div></div>
+        <div class="stat-card"><div class="stat-num" id="newUsersToday">-</div><div class="stat-label">Naye Users Aaj</div></div>
+        <div class="stat-card"><div class="stat-num" id="newUsersWeek">-</div><div class="stat-label">Naye Users 7 Din</div></div>
+        <div class="stat-card"><div class="stat-num" id="pendingClaimsStat">-</div><div class="stat-label">Pending Claims</div></div>
+        <div class="stat-card"><div class="stat-num" id="pendingProofsStat">-</div><div class="stat-label">Pending Proofs</div></div>
       </div>
     </div>
 
@@ -1567,15 +1571,50 @@ async function updateClaimStatus(claimId, newStatus) {
 }
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
+// Cheap count: uses a Firestore count query when the SDK supports it,
+// otherwise falls back to downloading the docs (same result, just slower).
+async function countDocs(query) {
+  try {
+    if (typeof query.count === 'function') {
+      const snap = await query.count().get();
+      return snap.data().count;
+    }
+  } catch(e) { /* fall through to the fallback below */ }
+  const snap = await query.get();
+  return snap.size;
+}
+
+async function loadExtraStats() {
+  try {
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const weekAgo = new Date(Date.now() - 7 * 86400000);
+    const ts = (d) => firebase.firestore.Timestamp.fromDate(d);
+    const [today, week, claims, proofs] = await Promise.all([
+      countDocs(db.collection('users').where('createdAt', '>=', ts(startOfToday))),
+      countDocs(db.collection('users').where('createdAt', '>=', ts(weekAgo))),
+      countDocs(db.collection('prize_claims').where('status', 'in', ['pending_info', 'reviewing'])),
+      countDocs(db.collection('winner_proofs').where('status', '==', 'pending')),
+    ]);
+    document.getElementById('newUsersToday').textContent = today;
+    document.getElementById('newUsersWeek').textContent = week;
+    document.getElementById('pendingClaimsStat').textContent = claims;
+    document.getElementById('pendingProofsStat').textContent = proofs;
+  } catch(e) {
+    console.error('Extra stats error:', e);
+  }
+}
+
 async function loadDashboard() {
   try {
     const drawsSnap = await db.collection('draws').get();
-    const usersSnap = await db.collection('users').get();
+    const totalUsersCount = await countDocs(db.collection('users'));
     const draws = drawsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     const active = draws.filter(d => d.status === 'active').length;
     document.getElementById('totalDraws').textContent = draws.length;
     document.getElementById('activeDraws').textContent = active;
-    document.getElementById('totalUsers').textContent = usersSnap.size;
+    document.getElementById('totalUsers').textContent = totalUsersCount;
+    loadExtraStats();
     renderDraws(draws);
     loadPendingReferrals();
     checkHappyHourStatus();
