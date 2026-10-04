@@ -144,6 +144,7 @@
     <button class="tab-btn" id="tabBtn-content" onclick="switchTab('content')">📢 Content</button>
     <button class="tab-btn" id="tabBtn-notifications" onclick="switchTab('notifications')">🔔 Notifications</button>
     <button class="tab-btn" id="tabBtn-settings" onclick="switchTab('settings')">⚙️ Settings</button>
+    <button class="tab-btn" id="tabBtn-audit" onclick="switchTab('audit')">📝 Audit</button>
   </div>
 
   <div class="content">
@@ -454,6 +455,31 @@ Question2|OptA|OptB|OptC|OptD|0"></textarea>
     </div>
 
     <!-- ═══════════════════════ TAB: SETTINGS ═════════════════════════ -->
+    <div class="tab-panel" id="tab-audit">
+      <div style="background:#16213E;border:1px solid rgba(240,165,0,0.4);border-radius:12px;padding:16px;margin-bottom:24px;">
+        <div style="font-size:15px;font-weight:bold;color:#F0A500;margin-bottom:4px;">📝 Audit Log</div>
+        <div style="font-size:12px;color:#9E9E9E;margin-bottom:12px;">Aakhri 100 admin actions. Yeh records edit ya delete nahi ho sakte.</div>
+        <div style="display:flex;gap:8px;margin-bottom:12px;">
+          <select class="form-input" id="auditFilter" onchange="renderAuditLog()">
+            <option value="all">Sab Actions</option>
+            <option value="tickets_adjusted">🎟️ Tickets Adjust</option>
+            <option value="user_banned">🚫 User Ban</option>
+            <option value="user_unbanned">✅ User Unban</option>
+            <option value="winner_selected">🏆 Winner Select</option>
+            <option value="proof_approved">✅ Proof Approve</option>
+            <option value="proof_rejected">❌ Proof Reject</option>
+            <option value="claim_status_changed">📦 Claim Status</option>
+            <option value="maintenance_toggled">🚧 Maintenance</option>
+            <option value="game_toggled">🎮 Game Switch</option>
+            <option value="draw_deleted">🗑️ Draw Delete</option>
+            <option value="leaderboard_reset">🏆 Leaderboard Reset</option>
+          </select>
+          <button class="btn btn-entries" onclick="loadAuditLog()">🔄 Refresh</button>
+        </div>
+        <div id="auditList"><div class="loading">Loading...</div></div>
+      </div>
+    </div>
+
     <div class="tab-panel" id="tab-settings">
 
       <div style="background:#16213E;border:1px solid rgba(231,76,60,0.5);border-radius:12px;padding:16px;margin-bottom:24px;">
@@ -1469,6 +1495,7 @@ async function approveProof(proofId, userId, type) {
       type: 'general', sent: false,
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
     });
+    logAudit('proof_approved', { proofId, userId, type, tickets: reward });
     showToast(`✅ Approved! +${reward} tickets diye gaye.`, false);
     loadProofs();
   } catch(e) { showToast('❌ Error: ' + e.message, true); }
@@ -1481,6 +1508,7 @@ async function rejectProof(proofId) {
       status: 'rejected',
       rejectedAt: firebase.firestore.FieldValue.serverTimestamp(),
     });
+    logAudit('proof_rejected', { proofId });
     showToast('❌ Submission reject ho gaya', false);
     loadProofs();
   } catch(e) { showToast('❌ Error: ' + e.message, true); }
@@ -1664,6 +1692,7 @@ async function loadDashboard() {
     checkLeaderboardStatus();
     loadAppControls();
     loadNotifHistory();
+    loadAuditLog();
     loadPolls(); // loads count only unless expanded
   } catch(e) {
     document.getElementById('drawsList').innerHTML = '<div class="loading">Error loading. Check Firestore rules.</div>';
@@ -1911,6 +1940,7 @@ async function confirmWinner() {
       topic: 'all_users', type: 'draw_result', sent: false,
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
     });
+    logAudit('winner_selected', { drawId: currentDrawId, prize: drawDataForWinner.prizeName || '', winnerId: selectedWinner.userId, winnerName: selectedWinner.name });
     showToast('🏆 Winner confirm! Ab Live Draw Chalao button dekhein.', false);
     setTimeout(() => loadDashboard(), 1500);
   } catch(e) { showToast('❌ Error: ' + e.message, true); }
@@ -2487,6 +2517,70 @@ async function sendCustomNotification() {
   } catch(e) { showToast('❌ Error: ' + e.message, true); }
 }
 
+// ── Audit Log ────────────────────────────────────────────────────────────────
+const AUDIT_LABELS = {
+  tickets_adjusted: '🎟️ Tickets Adjust',
+  user_banned: '🚫 User Ban',
+  user_unbanned: '✅ User Unban',
+  winner_selected: '🏆 Winner Select',
+  proof_approved: '✅ Proof Approve',
+  proof_rejected: '❌ Proof Reject',
+  claim_status_changed: '📦 Claim Status',
+  maintenance_toggled: '🚧 Maintenance',
+  game_toggled: '🎮 Game Switch',
+  draw_deleted: '🗑️ Draw Delete',
+  leaderboard_reset: '🏆 Leaderboard Reset',
+};
+let auditCache = [];
+
+// Fire-and-forget: a logging failure must never break the real action.
+async function logAudit(action, details) {
+  try {
+    await db.collection('admin_audit_log').add({
+      action,
+      details: details || {},
+      adminEmail: (auth.currentUser && auth.currentUser.email) || '',
+      timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+  } catch(e) { console.error('Audit log error:', e); }
+}
+
+async function loadAuditLog() {
+  const box = document.getElementById('auditList');
+  try {
+    const snap = await db.collection('admin_audit_log').orderBy('timestamp', 'desc').limit(100).get();
+    auditCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderAuditLog();
+  } catch(e) {
+    box.innerHTML = '<div class="loading">Error: ' + e.message + '</div>';
+  }
+}
+
+function renderAuditLog() {
+  const box = document.getElementById('auditList');
+  const filter = document.getElementById('auditFilter').value;
+  const rows = auditCache.filter(r => filter === 'all' || r.action === filter);
+  if (rows.length === 0) {
+    box.innerHTML = '<div class="loading">Koi record nahi mila.</div>';
+    return;
+  }
+  box.innerHTML = rows.map(r => {
+    const ms = tsToMs(r.timestamp);
+    const when = ms ? new Date(ms).toLocaleString('en-PK') : '-';
+    const details = Object.entries(r.details || {})
+      .map(([k, v]) => `${escHtml(k)}: <span style="color:#fff;">${escHtml(typeof v === 'object' ? JSON.stringify(v) : v)}</span>`)
+      .join(' &nbsp;•&nbsp; ');
+    return `
+      <div class="entry-item" style="flex-direction:column;align-items:flex-start;">
+        <div style="display:flex;justify-content:space-between;width:100%;gap:8px;">
+          <div class="entry-user">${AUDIT_LABELS[r.action] || escHtml(r.action)}</div>
+          <div class="entry-detail" style="white-space:nowrap;">${when}</div>
+        </div>
+        <div class="entry-detail" style="margin-top:4px;word-break:break-all;">${details || '-'}</div>
+      </div>`;
+  }).join('');
+}
+
 async function copyText(text) {
   try {
     await navigator.clipboard.writeText(text);
@@ -2708,6 +2802,7 @@ async function setUserBan(uid, ban) {
       bannedAt: ban ? firebase.firestore.FieldValue.serverTimestamp() : firebase.firestore.FieldValue.delete(),
     });
     userSearchCache[uid].isBanned = ban;
+    logAudit(ban ? 'user_banned' : 'user_unbanned', { uid, name: u.name || '', email: u.email || '' });
     showToast(ban ? '🚫 User ban ho gaya' : '✅ User unban ho gaya', false);
     renderUserResults();
   } catch(e) { showToast('❌ Error: ' + e.message, true); }
@@ -2736,6 +2831,7 @@ async function adjustUserTickets(uid) {
       timestamp: firebase.firestore.FieldValue.serverTimestamp(),
     });
     userSearchCache[uid].tickets = (u.tickets || 0) + amount;
+    logAudit('tickets_adjusted', { uid, name: u.name || '', amount, reason: reason.trim() || 'adjustment' });
     showToast('✅ Tickets update ho gaye', false);
     renderUserResults();
   } catch(e) { showToast('❌ Error: ' + e.message, true); }
