@@ -408,11 +408,46 @@ Question2|OptA|OptB|OptC|OptD|0"></textarea>
 
     <!-- ═══════════════════════ TAB: NOTIFICATIONS ════════════════════ -->
     <div class="tab-panel" id="tab-notifications">
-      <div class="coming-soon-box">
-        <div class="big-emoji">🔔</div>
-        <div style="font-weight:bold;color:#F0A500;margin-bottom:6px;">Notification Composer — Jald Aa Raha Hai</div>
-        <div style="font-size:13px;">Phase 5 mein build hoga — custom title/message bhej sakoge all users ya segments ko.</div>
+
+      <div style="background:#16213E;border:1px solid rgba(240,165,0,0.4);border-radius:12px;padding:16px;margin-bottom:24px;">
+        <div style="font-size:15px;font-weight:bold;color:#F0A500;margin-bottom:4px;">🔔 Notification Bhejo</div>
+        <div style="font-size:12px;color:#E67E22;margin-bottom:14px;">⚠️ Asli delivery tab shuru hogi jab Cloud Function deploy hoga (Blaze ke baad). Us se pehle bheje gaye messages kabhi deliver nahi honge.</div>
+
+        <div class="form-group">
+          <label class="form-label">Title</label>
+          <input class="form-input" id="notifTitle" maxlength="60" placeholder="e.g. 🎁 Naya Draw Aa Gaya!">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Message</label>
+          <input class="form-input" id="notifBody" maxlength="180" placeholder="e.g. iPhone ka draw shuru ho gaya, abhi enter karo!">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Kisko Bhejna Hai</label>
+            <select class="form-input" id="notifAudience" onchange="onNotifAudienceChange()">
+              <option value="all">👥 Sab Users</option>
+              <option value="single">👤 Ek User</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Tap Karne Par Kahan Khule</label>
+            <select class="form-input" id="notifTap">
+              <option value="general">Home Screen</option>
+              <option value="happy_hour">Tickets Screen</option>
+              <option value="new_draw">Winners Screen</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group" id="notifUidGroup" style="display:none;">
+          <label class="form-label">User ID (UID) — User Lookup se copy karo</label>
+          <input class="form-input" id="notifUid" placeholder="User ka UID paste karo">
+        </div>
+        <button class="submit-btn" onclick="sendCustomNotification()">📤 Notification Bhejo</button>
       </div>
+
+      <div class="section-title">📜 Recent Notifications</div>
+      <div id="notifHistoryList"><div class="loading">Loading...</div></div>
+
     </div>
 
     <!-- ═══════════════════════ TAB: SETTINGS ═════════════════════════ -->
@@ -1625,6 +1660,7 @@ async function loadDashboard() {
     checkExpiredWins();
     checkLeaderboardStatus();
     loadAppControls();
+    loadNotifHistory();
     loadPolls(); // loads count only unless expanded
   } catch(e) {
     document.getElementById('drawsList').innerHTML = '<div class="loading">Error loading. Check Firestore rules.</div>';
@@ -2403,6 +2439,82 @@ async function runSuspiciousScan() {
           <div class="draw-desc" style="margin-bottom:10px;">Tickets: ${u.tickets || 0} • Is hafte: ${u.weeklyTicketsEarned || 0} • Referrals: ${u.totalReferrals || 0} • Ads: ${u.totalAdsWatched || 0}</div>
           <button class="btn btn-entries" onclick="openUserInLookup('${escHtml(u.id)}')">🔎 Lookup Mein Kholo</button>
         </div>`).join('');
+  } catch(e) {
+    box.innerHTML = '<div class="loading">Error: ' + e.message + '</div>';
+  }
+}
+
+// ── Notification Composer ────────────────────────────────────────────────────
+function onNotifAudienceChange() {
+  document.getElementById('notifUidGroup').style.display =
+    document.getElementById('notifAudience').value === 'single' ? 'block' : 'none';
+}
+
+async function sendCustomNotification() {
+  const title = document.getElementById('notifTitle').value.trim();
+  const body = document.getElementById('notifBody').value.trim();
+  const audience = document.getElementById('notifAudience').value;
+  const type = document.getElementById('notifTap').value;
+  if (!title || !body) { showToast('❌ Title aur message dono likho!', true); return; }
+
+  const base = {
+    title, body, type,
+    sent: false,
+    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+  };
+
+  try {
+    if (audience === 'single') {
+      const uid = document.getElementById('notifUid').value.trim();
+      if (!uid) { showToast('❌ User ID likho!', true); return; }
+      const uDoc = await db.collection('users').doc(uid).get();
+      if (!uDoc.exists) { showToast('❌ Is ID ka koi user nahi mila', true); return; }
+      const name = uDoc.data().name || 'User';
+      if (!confirm(`${name} ko yeh notification bhejni hai?\n\n"${title}"\n${body}`)) return;
+      await db.collection('notifications').add({ ...base, userId: uid });
+    } else {
+      if (!confirm(`SAB users ko yeh notification bhejni hai?\n\n"${title}"\n${body}`)) return;
+      await db.collection('broadcast_notifications').add({ ...base, topic: 'all_users' });
+    }
+    document.getElementById('notifTitle').value = '';
+    document.getElementById('notifBody').value = '';
+    document.getElementById('notifUid').value = '';
+    showToast('✅ Notification queue mein add ho gayi', false);
+    loadNotifHistory();
+  } catch(e) { showToast('❌ Error: ' + e.message, true); }
+}
+
+async function loadNotifHistory() {
+  const box = document.getElementById('notifHistoryList');
+  try {
+    const [b, n] = await Promise.all([
+      db.collection('broadcast_notifications').orderBy('createdAt', 'desc').limit(15).get(),
+      db.collection('notifications').orderBy('createdAt', 'desc').limit(15).get(),
+    ]);
+    const items = [
+      ...b.docs.map(d => ({ kind: 'broadcast', ...d.data() })),
+      ...n.docs.map(d => ({ kind: 'user', ...d.data() })),
+    ].sort((x, y) => (tsToMs(y.createdAt) || 0) - (tsToMs(x.createdAt) || 0)).slice(0, 15);
+
+    if (items.length === 0) {
+      box.innerHTML = '<div class="loading">Abhi tak koi notification nahi bheji.</div>';
+      return;
+    }
+    box.innerHTML = items.map(it => {
+      const ms = tsToMs(it.createdAt);
+      const when = ms ? new Date(ms).toLocaleString('en-PK') : '-';
+      const sent = it.sent === true;
+      const to = it.kind === 'broadcast' ? '👥 Sab Users' : '👤 ' + escHtml((it.userId || '').substring(0, 8)) + '...';
+      return `
+        <div class="entry-item">
+          <div style="flex:1;min-width:0;">
+            <div class="entry-user">${escHtml(it.title || '-')}</div>
+            <div class="entry-detail">${escHtml(it.body || '')}</div>
+            <div class="entry-detail" style="margin-top:4px;">${to} • ${when}</div>
+          </div>
+          <span style="font-size:11px;font-weight:bold;white-space:nowrap;margin-left:8px;color:${sent ? '#27AE60' : '#F0A500'};">${sent ? '✅ Bheja gaya' : '⏳ Queue mein'}</span>
+        </div>`;
+    }).join('');
   } catch(e) {
     box.innerHTML = '<div class="loading">Error: ' + e.message + '</div>';
   }
