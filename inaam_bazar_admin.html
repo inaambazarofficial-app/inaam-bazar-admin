@@ -445,7 +445,10 @@ Question2|OptA|OptB|OptC|OptD|0"></textarea>
         <button class="submit-btn" onclick="sendCustomNotification()">📤 Notification Bhejo</button>
       </div>
 
-      <div class="section-title">📜 Recent Notifications</div>
+      <div class="section-title">
+        📜 Recent Notifications
+        <button class="btn btn-delete" style="padding:6px 12px;font-size:12px;" onclick="clearQueuedNotifications()">🗑️ Queue Saaf Karo</button>
+      </div>
       <div id="notifHistoryList"><div class="loading">Loading...</div></div>
 
     </div>
@@ -2484,7 +2487,104 @@ async function sendCustomNotification() {
   } catch(e) { showToast('❌ Error: ' + e.message, true); }
 }
 
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch(e) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); } catch(e2) {}
+    document.body.removeChild(ta);
+  }
+  showToast('📋 Copy ho gaya', false);
+}
+
+function copyBtn(value) {
+  if (!value) return '';
+  return `<button data-copy="${escHtml(value)}" onclick="copyText(this.dataset.copy)" style="background:rgba(240,165,0,0.15);color:#F0A500;border:1px solid rgba(240,165,0,0.4);border-radius:6px;padding:2px 8px;font-size:11px;cursor:pointer;margin-left:6px;">📋 Copy</button>`;
+}
+
+async function clearQueuedNotifications() {
+  try {
+    const [b, n] = await Promise.all([
+      db.collection('broadcast_notifications').where('sent', '==', false).get(),
+      db.collection('notifications').where('sent', '==', false).get(),
+    ]);
+    const docs = [...b.docs, ...n.docs];
+    if (docs.length === 0) { showToast('✅ Queue pehle se khali hai', false); return; }
+    if (!confirm(`${docs.length} queued (na bheji gayi) notifications delete karni hain?\n\nJo notifications bheji ja chuki hain wo delete nahi hongi.`)) return;
+    for (let i = 0; i < docs.length; i += 400) {
+      const batch = db.batch();
+      docs.slice(i, i + 400).forEach(d => batch.delete(d.ref));
+      await batch.commit();
+    }
+    showToast(`🗑️ ${docs.length} notifications delete ho gayi`, false);
+    loadNotifHistory();
+  } catch(e) { showToast('❌ Error: ' + e.message, true); }
+}
+
 async function loadNotifHistory() {
+  const box = document.getElementById('notifHistoryList');
+  try {
+    const [b, n] = await Promise.all([
+      db.collection('broadcast_notifications').orderBy('createdAt', 'desc').limit(15).get(),
+      db.collection('notifications').orderBy('createdAt', 'desc').limit(15).get(),
+    ]);
+    const items = [
+      ...b.docs.map(d => ({ kind: 'broadcast', ...d.data() })),
+      ...n.docs.map(d => ({ kind: 'user', ...d.data() })),
+    ].sort((x, y) => (tsToMs(y.createdAt) || 0) - (tsToMs(x.createdAt) || 0)).slice(0, 15);
+
+    if (items.length === 0) {
+      box.innerHTML = '<div class="loading">Abhi tak koi notification nahi bheji.</div>';
+      return;
+    }
+
+    // Look up each recipient so we can show their name and full email
+    const uids = [...new Set(items.filter(i => i.kind === 'user' && i.userId).map(i => i.userId))];
+    const userMap = {};
+    await Promise.all(uids.map(async uid => {
+      try {
+        const d = await db.collection('users').doc(uid).get();
+        if (d.exists) userMap[uid] = d.data();
+      } catch(e) {}
+    }));
+
+    box.innerHTML = items.map(it => {
+      const ms = tsToMs(it.createdAt);
+      const when = ms ? new Date(ms).toLocaleString('en-PK') : '-';
+      const sent = it.sent === true;
+      let toHtml;
+      if (it.kind === 'broadcast') {
+        toHtml = `<div class="entry-detail" style="margin-top:4px;">👥 Sab Users</div>`;
+      } else {
+        const u = userMap[it.userId] || {};
+        toHtml = `
+          <div class="entry-detail" style="margin-top:4px;word-break:break-all;">👤 ${escHtml(u.name || 'Unknown')}</div>
+          <div class="entry-detail" style="word-break:break-all;">✉️ ${escHtml(u.email || '-')}${copyBtn(u.email)}</div>
+          <div class="entry-detail" style="word-break:break-all;">🆔 ${escHtml(it.userId || '-')}${copyBtn(it.userId)}</div>`;
+      }
+      return `
+        <div class="entry-item">
+          <div style="flex:1;min-width:0;">
+            <div class="entry-user">${escHtml(it.title || '-')}</div>
+            <div class="entry-detail">${escHtml(it.body || '')}</div>
+            ${toHtml}
+            <div class="entry-detail">🕒 ${when}</div>
+          </div>
+          <span style="font-size:11px;font-weight:bold;white-space:nowrap;margin-left:8px;color:${sent ? '#27AE60' : '#F0A500'};">${sent ? '✅ Bheja gaya' : '⏳ Queue mein'}</span>
+        </div>`;
+    }).join('');
+  } catch(e) {
+    box.innerHTML = '<div class="loading">Error: ' + e.message + '</div>';
+  }
+}
+
+async function loadNotifHistoryOld() {
   const box = document.getElementById('notifHistoryList');
   try {
     const [b, n] = await Promise.all([
