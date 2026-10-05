@@ -965,6 +965,7 @@ async function runWeeklyLeaderboardReset() {
       processedAt: firebase.firestore.FieldValue.serverTimestamp(),
     });
 
+    logAudit('leaderboard_reset', { weekKey, winnersRewarded: ranked.length });
     showToast(`✅ Reset complete! ${ranked.length} winners rewarded, sab ke counters reset ho gaye.`, false);
     checkLeaderboardStatus();
   } catch(e) {
@@ -1629,6 +1630,8 @@ async function updateClaimStatus(claimId, newStatus) {
       status: newStatus,
       statusUpdatedAt: firebase.firestore.FieldValue.serverTimestamp(),
     });
+    const claimForLog = allClaimsCache.find(x => x.id === claimId) || {};
+    logAudit('claim_status_changed', { claimId, winner: claimForLog.fullName || '', prize: claimForLog.prizeName || '', newStatus });
     showToast('✅ Status update ho gaya!', false);
     loadClaims();
   } catch(e) {
@@ -2380,6 +2383,7 @@ async function deleteDraw(drawId, name) {
       });
     }
     await db.collection('draws').doc(drawId).delete();
+    logAudit('draw_deleted', { drawId, prize: name, winner: (drawData && drawData.winnerName) || '' });
     showToast('🗑️ Draw delete ho gaya', false);
     setTimeout(() => loadDashboard(), 800);
   } catch(e) { showToast('❌ Error: ' + e.message, true); }
@@ -2924,6 +2928,7 @@ async function toggleMaintenance() {
       maintenanceMessage: message,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
     }, { merge: true });
+    logAudit('maintenance_toggled', { enabled: turningOn, message });
     showToast(turningOn ? '🚧 Maintenance mode ON' : '✅ App wapas chalu', false);
     loadAppControls();
   } catch(e) { showToast('❌ Error: ' + e.message, true); }
@@ -2938,6 +2943,7 @@ async function toggleGame(key) {
       games: { [key]: !enabled },
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
     }, { merge: true });
+    logAudit('game_toggled', { game: game.label, enabled: !enabled });
     showToast(enabled ? `🔴 ${game.label} band` : `🟢 ${game.label} chalu`, false);
     loadAppControls();
   } catch(e) { showToast('❌ Error: ' + e.message, true); }
