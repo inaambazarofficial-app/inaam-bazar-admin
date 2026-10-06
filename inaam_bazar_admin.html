@@ -2560,6 +2560,17 @@ async function loadAuditLog() {
   }
 }
 
+function formatAuditPair(action, k, v) {
+  let label = k;
+  let val = typeof v === 'object' ? JSON.stringify(v) : v;
+  if (k === 'enabled' && typeof v === 'boolean') {
+    label = 'status';
+    if (action === 'maintenance_toggled') val = v ? '🚧 ON (app band)' : '✅ OFF (app chalu)';
+    else val = v ? '🟢 Chalu' : '🔴 Band';
+  }
+  return `${escHtml(label)}: <span style="color:#fff;">${escHtml(val)}</span>`;
+}
+
 function renderAuditLog() {
   const box = document.getElementById('auditList');
   const filter = document.getElementById('auditFilter').value;
@@ -2572,7 +2583,7 @@ function renderAuditLog() {
     const ms = tsToMs(r.timestamp);
     const when = ms ? new Date(ms).toLocaleString('en-PK') : '-';
     const details = Object.entries(r.details || {})
-      .map(([k, v]) => `${escHtml(k)}: <span style="color:#fff;">${escHtml(typeof v === 'object' ? JSON.stringify(v) : v)}</span>`)
+      .map(([k, v]) => formatAuditPair(r.action, k, v))
       .join(' &nbsp;•&nbsp; ');
     return `
       <div class="entry-item" style="flex-direction:column;align-items:flex-start;">
