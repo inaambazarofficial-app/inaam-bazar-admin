@@ -2565,8 +2565,8 @@ function formatAuditPair(action, k, v) {
   let val = typeof v === 'object' ? JSON.stringify(v) : v;
   if (k === 'enabled' && typeof v === 'boolean') {
     label = 'status';
-    if (action === 'maintenance_toggled') val = v ? '🚧 ON (app band)' : '✅ OFF (app chalu)';
-    else val = v ? '🟢 Chalu' : '🔴 Band';
+    if (action === 'maintenance_toggled') val = v ? '🚧 ON' : '✅ OFF';
+    else val = v ? '🟢 Active' : '🔴 Disabled';
   }
   return `${escHtml(label)}: <span style="color:#fff;">${escHtml(val)}</span>`;
 }
@@ -2904,11 +2904,11 @@ async function loadAppControls() {
 function renderAppControls() {
   const on = appControlsCache.maintenanceMode;
   const statusEl = document.getElementById('maintenanceStatus');
-  statusEl.textContent = on ? '🔴 ON — app band hai' : '🟢 OFF — app normal hai';
+  statusEl.textContent = on ? '🔴 ON — app disabled' : '🟢 OFF — app active';
   statusEl.style.color = on ? '#E74C3C' : '#27AE60';
   document.getElementById('maintenanceMessage').value = appControlsCache.maintenanceMessage;
   const btn = document.getElementById('maintenanceToggleBtn');
-  btn.textContent = on ? '✅ Maintenance Band Karo (App Wapas Chalu)' : '🚧 Maintenance Shuru Karo';
+  btn.textContent = on ? '✅ Turn OFF Maintenance' : '🚧 Turn ON Maintenance';
   btn.style.background = on ? '#27AE60' : '#E74C3C';
   btn.style.color = 'white';
 
@@ -2918,8 +2918,8 @@ function renderAppControls() {
       <div class="entry-item">
         <div class="entry-user">${g.emoji} ${g.label}</div>
         <div style="display:flex;align-items:center;gap:10px;">
-          <span style="font-size:12px;font-weight:bold;color:${enabled ? '#27AE60' : '#E74C3C'};">${enabled ? '🟢 Chalu' : '🔴 Band'}</span>
-          <button class="btn" style="padding:6px 12px;font-size:12px;background:${enabled ? 'rgba(231,76,60,0.15)' : '#27AE60'};color:${enabled ? '#E74C3C' : 'white'};border:1px solid ${enabled ? 'rgba(231,76,60,0.4)' : '#27AE60'};" onclick="toggleGame('${g.key}')">${enabled ? 'Band Karo' : 'Chalu Karo'}</button>
+          <span style="font-size:12px;font-weight:bold;color:${enabled ? '#27AE60' : '#E74C3C'};">${enabled ? '🟢 Active' : '🔴 Disabled'}</span>
+          <button class="btn" style="padding:6px 12px;font-size:12px;background:${enabled ? 'rgba(231,76,60,0.15)' : '#27AE60'};color:${enabled ? '#E74C3C' : 'white'};border:1px solid ${enabled ? 'rgba(231,76,60,0.4)' : '#27AE60'};" onclick="toggleGame('${g.key}')">${enabled ? 'Turn OFF' : 'Turn ON'}</button>
         </div>
       </div>`;
   }).join('');
@@ -2931,7 +2931,7 @@ async function toggleMaintenance() {
     'App maintenance ho rahi hai. Thodi der baad dobara try karein.';
   const question = turningOn
     ? 'Maintenance mode ON karna chahte hain? Sab users ke liye poori app band ho jayegi!'
-    : 'Maintenance mode band karke app wapas chalu karein?';
+    : 'Maintenance mode OFF karke app wapas active karein?';
   if (!confirm(question)) return;
   try {
     await db.collection('config').doc('app_controls').set({
@@ -2940,7 +2940,7 @@ async function toggleMaintenance() {
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
     }, { merge: true });
     logAudit('maintenance_toggled', { enabled: turningOn, message });
-    showToast(turningOn ? '🚧 Maintenance mode ON' : '✅ App wapas chalu', false);
+    showToast(turningOn ? '🚧 Maintenance ON' : '✅ Maintenance OFF', false);
     loadAppControls();
   } catch(e) { showToast('❌ Error: ' + e.message, true); }
 }
@@ -2955,7 +2955,7 @@ async function toggleGame(key) {
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
     }, { merge: true });
     logAudit('game_toggled', { game: game.label, enabled: !enabled });
-    showToast(enabled ? `🔴 ${game.label} band` : `🟢 ${game.label} chalu`, false);
+    showToast(enabled ? `🔴 ${game.label} disabled` : `🟢 ${game.label} active`, false);
     loadAppControls();
   } catch(e) { showToast('❌ Error: ' + e.message, true); }
 }
