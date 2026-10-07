@@ -235,6 +235,7 @@
           <button class="filter-tab active" id="proofFilterPending" onclick="setProofFilter('pending')">⏳ Pending</button>
           <button class="filter-tab" id="proofFilterApproved" onclick="setProofFilter('approved')">✅ Approved</button>
           <button class="filter-tab" id="proofFilterRejected" onclick="setProofFilter('rejected')">❌ Rejected</button>
+          <button class="filter-tab" id="proofFilterReupload" onclick="setProofFilter('reupload_requested')">🔄 Re-upload</button>
           <button class="filter-tab" id="proofFilterAll" onclick="setProofFilter('all')">Sab</button>
         </div>
         <div id="proofsList" style="margin-bottom:24px;"><div class="loading">Loading submissions...</div></div>
@@ -468,6 +469,7 @@ Question2|OptA|OptB|OptC|OptD|0"></textarea>
             <option value="winner_selected">🏆 Winner Select</option>
             <option value="proof_approved">✅ Proof Approve</option>
             <option value="proof_rejected">❌ Proof Reject</option>
+            <option value="proof_reupload_requested">🔄 Proof Re-upload</option>
             <option value="claim_status_changed">📦 Claim Status</option>
             <option value="maintenance_toggled">🚧 Maintenance</option>
             <option value="game_toggled">🎮 Game Switch</option>
@@ -1413,7 +1415,7 @@ function toggleProofsPanel(e) {
 
 function setProofFilter(filter) {
   proofFilter = filter;
-  ['Pending','Approved','Rejected','All'].forEach(f => {
+  ['Pending','Approved','Rejected','Reupload','All'].forEach(f => {
     document.getElementById('proofFilter' + f)?.classList.remove('active');
   });
   const idMap = { pending: 'proofFilterPending', approved: 'proofFilterApproved', rejected: 'proofFilterRejected', all: 'proofFilterAll' };
@@ -1438,8 +1440,8 @@ function renderProofs() {
     document.getElementById('proofsList').innerHTML = '<div class="loading">Is filter mein koi submission nahi.</div>';
     return;
   }
-  const statusColors = { pending: '#F0A500', approved: '#27AE60', rejected: '#E74C3C' };
-  const statusLabels = { pending: '⏳ Pending', approved: '✅ Approved', rejected: '❌ Rejected' };
+  const statusColors = { pending: '#F0A500', approved: '#27AE60', rejected: '#E74C3C', reupload_requested: '#3498DB' };
+  const statusLabels = { pending: '⏳ Pending', approved: '✅ Approved', rejected: '❌ Rejected', reupload_requested: '🔄 Re-upload Maanga' };
 
   document.getElementById('proofsList').innerHTML = filtered.map(p => {
     const color = statusColors[p.status] || '#9E9E9E';
@@ -1463,6 +1465,7 @@ function renderProofs() {
         ${p.status === 'pending' ? `
         <div class="draw-actions">
           <button class="btn btn-confirm" style="background:#27AE60;color:white;" onclick="approveProof('${p.id}', '${p.userId}', '${p.type}')">✅ Approve (+${PROOF_REWARDS[p.type] || 0} tickets)</button>
+          <button class="btn" style="background:rgba(52,152,219,0.2);color:#3498DB;border:1px solid rgba(52,152,219,0.4);" onclick="requestReupload('${p.id}', '${p.userId}', '${p.type}')">🔄 Re-upload</button>
           <button class="btn btn-delete" onclick="rejectProof('${p.id}')">❌ Reject</button>
         </div>` : ''}
       </div>`;
@@ -1498,6 +1501,34 @@ async function approveProof(proofId, userId, type) {
     });
     logAudit('proof_approved', { proofId, userId, type, tickets: reward });
     showToast(`✅ Approved! +${reward} tickets diye gaye.`, false);
+    loadProofs();
+  } catch(e) { showToast('❌ Error: ' + e.message, true); }
+}
+
+const REUPLOAD_WINDOW_DAYS = 7; // fresh time the user gets to upload again
+
+async function requestReupload(proofId, userId, type) {
+  const reason = prompt('User ko wajah batao (yeh unko app mein dikhegi):', 'Photo/video clear nahi hai, dobara upload karein.');
+  if (reason === null) return;
+  const cleanReason = reason.trim() || 'Dobara upload karein.';
+  if (!confirm(`User ko dobara upload karne ko kahein?\n\nWajah: ${cleanReason}\n\nUnko ${REUPLOAD_WINDOW_DAYS} din milenge.`)) return;
+  try {
+    const until = new Date(Date.now() + REUPLOAD_WINDOW_DAYS * 86400000);
+    await db.collection('winner_proofs').doc(proofId).update({
+      status: 'reupload_requested',
+      reuploadReason: cleanReason,
+      reuploadRequestedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      reuploadUntil: firebase.firestore.Timestamp.fromDate(until),
+    });
+    await db.collection('notifications').add({
+      userId: userId,
+      title: '🔄 Dobara Upload Karein',
+      body: cleanReason,
+      type: 'general', sent: false,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    logAudit('proof_reupload_requested', { proofId, userId, type, reason: cleanReason });
+    showToast('🔄 User ko dobara upload ka option mil gaya', false);
     loadProofs();
   } catch(e) { showToast('❌ Error: ' + e.message, true); }
 }
@@ -2529,6 +2560,7 @@ const AUDIT_LABELS = {
   winner_selected: '🏆 Winner Select',
   proof_approved: '✅ Proof Approve',
   proof_rejected: '❌ Proof Reject',
+  proof_reupload_requested: '🔄 Proof Re-upload',
   claim_status_changed: '📦 Claim Status',
   maintenance_toggled: '🚧 Maintenance',
   game_toggled: '🎮 Game Switch',
