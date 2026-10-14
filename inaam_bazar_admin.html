@@ -995,7 +995,16 @@ async function runWeeklyLeaderboardReset() {
 async function startHappyHour() {
   const multiplier = parseInt(document.getElementById('happyHourMultiplier').value);
   const durationMin = parseInt(document.getElementById('happyHourDuration').value);
-  const endTime = new Date(Date.now() + durationMin * 60000);
+  let endTime;
+  try {
+    const timeCheckRef = db.collection('config').doc('_time_check');
+    await timeCheckRef.set({ ts: firebase.firestore.FieldValue.serverTimestamp() });
+    const timeCheckDoc = await timeCheckRef.get();
+    endTime = new Date(timeCheckDoc.data().ts.toDate().getTime() + durationMin * 60000);
+  } catch(e) {
+    showToast('❌ Server time nahi mila: ' + e.message, true);
+    return;
+  }
 
   try {
     await db.collection('config').doc('happy_hour').set({
