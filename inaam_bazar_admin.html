@@ -767,6 +767,51 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
+
+// ── Auto-push ────────────────────────────────────────────────────────────────
+// Every notification document the admin panel creates is also sent as a real
+// push (through the Cloudflare Worker) and then marked as sent.
+// 'winner' and 'draw_result' are held back here: they are sent when you start
+// the Live Draw instead, so nobody hears the result before the reveal.
+const AUTO_PUSH_HOLD_TYPES = ['winner', 'draw_result'];
+
+(function enableAutoPush() {
+  const origCollection = db.collection.bind(db);
+  db.collection = function (name) {
+    const col = origCollection(name);
+    if (name !== 'notifications' && name !== 'broadcast_notifications') return col;
+    const origAdd = col.add.bind(col);
+    col.add = async function (data) {
+      const ref = await origAdd(data);
+      if (data && data.sent === false && !data.manualPush &&
+          !AUTO_PUSH_HOLD_TYPES.includes(data.type)) {
+        autoPush(name, ref, data); // not awaited: never slows or breaks the real action
+      }
+      return ref;
+    };
+    return col;
+  };
+})();
+
+async function autoPush(name, ref, data) {
+  try {
+    let payload;
+    if (name === 'broadcast_notifications') {
+      if (!data.topic) return;
+      payload = { topic: data.topic, title: data.title, body: data.body, type: data.type || 'general' };
+    } else {
+      if (!data.userId) return;
+      const u = await db.collection('users').doc(data.userId).get();
+      const token = u.exists ? u.data().fcmToken : null;
+      if (!token) return;
+      payload = { token, title: data.title, body: data.body, type: data.type || 'general' };
+    }
+    const ok = await sendPush(payload);
+    if (ok) await ref.update({ sent: true, sentAt: firebase.firestore.FieldValue.serverTimestamp() });
+  } catch (e) {
+    console.error('autoPush error', e);
+  }
+}
 let currentDrawId = null;
 let currentEntries = [];
 let selectedWinner = null;
@@ -1970,6 +2015,7 @@ async function confirmWinner() {
       winnerCity: '',
       winnerEmail: selectedWinner.email || '',
       pendingCompletion: true,
+      liveDrawPushSent: false,
       claimSubmitted: false,
     });
     const drawSnapForWinner = await db.collection('draws').doc(currentDrawId).get();
@@ -1995,7 +2041,7 @@ async function confirmWinner() {
     });
     await db.collection('broadcast_notifications').add({
       title: '🎁 Naya Draw Result!',
-      body: 'Is baar kismat ne saath nahi diya! Agli baar zaroor jeetenge. Try karte raho! 💪',
+      body: 'Draw ka result aa gaya hai! Winners Screen mein dekhein.',
       topic: 'all_users', type: 'draw_result', sent: false,
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
     });
@@ -2276,6 +2322,47 @@ async function saveEditDraw() {
 }
 
 // ── Live Draw ─────────────────────────────────────────────────────────────────
+// Sends the "you won" push to the winner and the "result is out" push to
+// everyone, once per draw, at the moment the Live Draw starts.
+async function sendLiveDrawPushes(drawId, prizeName) {
+  try {
+    const drawRef = db.collection('draws').doc(drawId);
+    const d = (await drawRef.get()).data() || {};
+    if (d.liveDrawPushSent === true) return; // already sent (e.g. replaying a draw)
+    await drawRef.update({ liveDrawPushSent: true });
+
+    if (d.winnerId) {
+      const u = await db.collection('users').doc(d.winnerId).get();
+      const token = u.exists ? u.data().fcmToken : null;
+      if (token) {
+        await sendPush({
+          token,
+          title: '🏆 Mubarak Ho! Aap Ne Jeeta!',
+          body: `Aap ne ${prizeName} jeeta! App kholein aur apna prize claim karein.`,
+          type: 'winner',
+        });
+      }
+    }
+    await sendPush({
+      topic: 'all_users',
+      title: '🎁 Naya Draw Result!',
+      body: `${prizeName} ka winner chun liya gaya hai. Winners Screen mein dekhein!`,
+      type: 'draw_result',
+    });
+
+    // Mark the held notification records as sent so the history stays accurate
+    const held = [
+      ...(d.winnerId ? (await db.collection('notifications').where('userId', '==', d.winnerId).where('type', '==', 'winner').where('sent', '==', false).get()).docs : []),
+      ...(await db.collection('broadcast_notifications').where('type', '==', 'draw_result').where('sent', '==', false).get()).docs,
+    ];
+    for (const h of held) {
+      await h.ref.update({ sent: true, sentAt: firebase.firestore.FieldValue.serverTimestamp() });
+    }
+  } catch (e) {
+    console.error('sendLiveDrawPushes error', e);
+  }
+}
+
 async function startLiveDraw(drawId, prizeName, prizeEmoji, winnerName) {
   if (!confirm(`Live Draw shuru karein?\n\nPrize: ${prizeName}\nWinner: ${winnerName}`)) return;
   try {
@@ -2287,6 +2374,7 @@ async function startLiveDraw(drawId, prizeName, prizeEmoji, winnerName) {
       startedAt: firebase.firestore.FieldValue.serverTimestamp(),
     });
     showToast('🎬 Live Draw shuru ho gaya!', false);
+    sendLiveDrawPushes(drawId, prizeName);
   } catch(e) { showToast('❌ Error: ' + e.message, true); }
 }
 
@@ -2589,7 +2677,7 @@ async function sendCustomNotification() {
   if (!title || !body) { showToast('❌ Title aur message dono likho!', true); return; }
 
   const base = {
-    title, body, type,
+    title, body, type, manualPush: true,
     sent: false,
     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
   };
