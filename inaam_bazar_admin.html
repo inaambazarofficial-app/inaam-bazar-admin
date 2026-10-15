@@ -2553,6 +2553,34 @@ function onNotifAudienceChange() {
     document.getElementById('notifAudience').value === 'single' ? 'block' : 'none';
 }
 
+// ── Push sender (Cloudflare Worker) ──────────────────────────────────────────
+const PUSH_WORKER_URL = 'https://inaam-push.inaambazar.workers.dev';
+
+async function sendPush(payload) {
+  try {
+    const idToken = await auth.currentUser.getIdToken();
+    const res = await fetch(PUSH_WORKER_URL + '/send', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + idToken,
+      },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) {
+      console.error('Push failed', res.status, data);
+      showToast('⚠️ Push nahi gayi: ' + (data.error || res.status) + (data.detail ? ' — ' + data.detail : ''), true);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.error('Push error', e);
+    showToast('⚠️ Push nahi gayi: ' + e.message, true);
+    return false;
+  }
+}
+
 async function sendCustomNotification() {
   const title = document.getElementById('notifTitle').value.trim();
   const body = document.getElementById('notifBody').value.trim();
@@ -2574,15 +2602,24 @@ async function sendCustomNotification() {
       if (!uDoc.exists) { showToast('❌ Is ID ka koi user nahi mila', true); return; }
       const name = uDoc.data().name || 'User';
       if (!confirm(`${name} ko yeh notification bhejni hai?\n\n"${title}"\n${body}`)) return;
-      await db.collection('notifications').add({ ...base, userId: uid });
+      const ref = await db.collection('notifications').add({ ...base, userId: uid });
+      const fcmToken = uDoc.data().fcmToken;
+      if (!fcmToken) {
+        showToast('⚠️ Is user ka push token nahi mila — sirf save hua', true);
+      } else {
+        const ok = await sendPush({ token: fcmToken, title, body, type });
+        if (ok) await ref.update({ sent: true, sentAt: firebase.firestore.FieldValue.serverTimestamp() });
+      }
     } else {
       if (!confirm(`SAB users ko yeh notification bhejni hai?\n\n"${title}"\n${body}`)) return;
-      await db.collection('broadcast_notifications').add({ ...base, topic: 'all_users' });
+      const ref = await db.collection('broadcast_notifications').add({ ...base, topic: 'all_users' });
+      const ok = await sendPush({ topic: 'all_users', title, body, type });
+      if (ok) await ref.update({ sent: true, sentAt: firebase.firestore.FieldValue.serverTimestamp() });
     }
     document.getElementById('notifTitle').value = '';
     document.getElementById('notifBody').value = '';
     document.getElementById('notifUid').value = '';
-    showToast('✅ Notification queue mein add ho gayi', false);
+    showToast('✅ Notification save ho gayi — neeche status dekhein', false);
     loadNotifHistory();
   } catch(e) { showToast('❌ Error: ' + e.message, true); }
 }
