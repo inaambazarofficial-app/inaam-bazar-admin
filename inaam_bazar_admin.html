@@ -3150,15 +3150,13 @@ function safeUrl(u) {
 // ── Private user info (email, phone, push token) lives in users_private ──
 // Only the user and the admin can read it. Old accounts may still have it in
 // "users", so we fall back to that until they log in with the new app.
-const userPrivateCache = {};
+// Always read fresh — a saved copy could hold an old phone's push address
 async function getUserPrivate(uid) {
   if (!uid) return {};
-  if (userPrivateCache[uid]) return userPrivateCache[uid];
   try {
     const d = await db.collection('users_private').doc(uid).get();
-    userPrivateCache[uid] = d.exists ? d.data() : {};
-  } catch (e) { userPrivateCache[uid] = {}; }
-  return userPrivateCache[uid];
+    return d.exists ? d.data() : {};
+  } catch (e) { return {}; }
 }
 async function addPrivateInfo(uid, data) {
   const p = await getUserPrivate(uid);
