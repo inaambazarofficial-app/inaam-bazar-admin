@@ -1937,6 +1937,7 @@ function buildDrawCard(draw, showCollapse) {
         <button class="btn btn-entries" onclick="viewEntries('${draw.id}')">👥 Entries</button>
         <button class="btn" style="background:rgba(52,152,219,0.2);color:#3498DB;border:1px solid rgba(52,152,219,0.4);" onclick="showEditDrawModal('${draw.id}')">✏️ Edit</button>
         ${isActive && !isPending ? `<button class="btn btn-winner" onclick="selectWinner('${draw.id}')">🏆 Winner Chuno</button>` : ''}
+        ${isPending ? `<button class="btn" style="background:rgba(240,165,0,0.2);color:#F0A500;border:1px solid rgba(240,165,0,0.5);" onclick="announceLiveDrawSoon('${draw.id}')">🔔 5 Min Alert Bhejo${draw.liveSoonPushSentAt ? ' ✓' : ''}</button>` : ''}
         ${isPending ? `<button class="btn" style="background:rgba(155,89,182,0.3);color:#9B59B6;border:1px solid rgba(155,89,182,0.5);" onclick="startLiveDraw('${draw.id}')">🎬 Live Draw Chalao</button>` : ''}
         ${isCompleted && draw.winnerName ? `<button class="btn" style="background:rgba(155,89,182,0.3);color:#9B59B6;border:1px solid rgba(155,89,182,0.5);" onclick="startLiveDraw('${draw.id}')">🎬 Live Draw Chalao</button>` : ''}
         ${isActive && !isPending ? `<button class="btn" style="background:${draw.isFeatured ? 'rgba(240,165,0,0.3)' : 'rgba(255,255,255,0.1)'}; color:${draw.isFeatured ? '#F0A500' : '#fff'}; border:1px solid ${draw.isFeatured ? '#F0A500' : 'rgba(255,255,255,0.2)'};" onclick="toggleFeatured('${draw.id}', ${draw.isFeatured === true})">${draw.isFeatured ? '⭐ Featured' : '☆ Feature Karo'}</button>` : ''}
@@ -2384,6 +2385,32 @@ async function sendLiveDrawPushes(drawId, prizeName) {
   } catch (e) {
     console.error('sendLiveDrawPushes error', e);
   }
+}
+
+// Tells all users "Live Draw 5 minute mein shuru hone wala hai".
+// Press this, wait 5 minutes, then press "Live Draw Chalao".
+async function announceLiveDrawSoon(drawId) {
+  const draw = findDraw(drawId);
+  if (!draw) { showToast('❌ Draw nahi mila, page refresh karo', true); return; }
+  const prizeName = draw.prizeName || 'Prize';
+  const already = draw.liveSoonPushSentAt
+    ? '\n\n⚠️ Yeh alert is draw ke liye pehle bhi bhej chuke ho.'
+    : '';
+  if (!confirm(`Sab users ko alert bhejein?\n\n"⏰ ${prizeName} ka Live Draw 5 minute mein!"${already}`)) return;
+  const ok = await sendPush({
+    topic: 'all_users',
+    title: '⏰ Live Draw 5 Minute Mein!',
+    body: `${prizeName} ka Live Draw 5 minute mein shuru hone wala hai. App kholein aur live dekhein!`,
+    type: 'general',
+  });
+  if (!ok) return;
+  try {
+    await db.collection('draws').doc(drawId).update({
+      liveSoonPushSentAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+  } catch (e) {}
+  showToast('✅ Alert bhej diya! 5 minute baad "Live Draw Chalao" dabayein', false);
+  setTimeout(() => loadDashboard(), 800);
 }
 
 async function startLiveDraw(drawId) {
