@@ -1938,7 +1938,7 @@ function buildDrawCard(draw, showCollapse) {
         <button class="btn" style="background:rgba(52,152,219,0.2);color:#3498DB;border:1px solid rgba(52,152,219,0.4);" onclick="showEditDrawModal('${draw.id}')">✏️ Edit</button>
         ${isActive && !isPending ? `<button class="btn btn-winner" onclick="selectWinner('${draw.id}')">🏆 Winner Chuno</button>` : ''}
         ${isPending ? `<button class="btn" style="background:rgba(240,165,0,0.2);color:#F0A500;border:1px solid rgba(240,165,0,0.5);" onclick="announceLiveDrawSoon('${draw.id}')">🔔 5 Min Alert Bhejo${draw.liveSoonPushSentAt ? ' ✓' : ''}</button>` : ''}
-        ${isPending ? `<button class="btn" style="background:rgba(155,89,182,0.3);color:#9B59B6;border:1px solid rgba(155,89,182,0.5);" onclick="startLiveDraw('${draw.id}')">🎬 Live Draw Chalao</button>` : ''}
+        ${isPending ? `<button class="btn" style="background:rgba(155,89,182,0.3);color:#9B59B6;border:1px solid rgba(155,89,182,0.5);" onclick="startLiveDraw('${draw.id}')">🎬 Live Draw Chalao${draw.liveSoonPushSentAt && draw.liveSoonPushSentAt.seconds ? ` <span class="live-soon-timer" data-at="${Number(draw.liveSoonPushSentAt.seconds) * 1000}"></span>` : ''}</button>` : ''}
         ${isCompleted && draw.winnerName ? `<button class="btn" style="background:rgba(155,89,182,0.3);color:#9B59B6;border:1px solid rgba(155,89,182,0.5);" onclick="startLiveDraw('${draw.id}')">🎬 Live Draw Chalao</button>` : ''}
         ${isActive && !isPending ? `<button class="btn" style="background:${draw.isFeatured ? 'rgba(240,165,0,0.3)' : 'rgba(255,255,255,0.1)'}; color:${draw.isFeatured ? '#F0A500' : '#fff'}; border:1px solid ${draw.isFeatured ? '#F0A500' : 'rgba(255,255,255,0.2)'};" onclick="toggleFeatured('${draw.id}', ${draw.isFeatured === true})">${draw.isFeatured ? '⭐ Featured' : '☆ Feature Karo'}</button>` : ''}
         <button class="btn btn-delete" onclick="deleteDraw('${draw.id}')">🗑️ Delete</button>
@@ -2386,6 +2386,24 @@ async function sendLiveDrawPushes(drawId, prizeName) {
     console.error('sendLiveDrawPushes error', e);
   }
 }
+
+// Updates the "⏳ 04:32 baqi" timer on Live Draw buttons every second
+setInterval(() => {
+  document.querySelectorAll('.live-soon-timer').forEach(el => {
+    const at = Number(el.dataset.at);
+    if (!at) return;
+    const elapsed = Date.now() - at;
+    const left = 5 * 60 * 1000 - elapsed;
+    if (elapsed > 15 * 60 * 1000) { el.textContent = ''; return; }
+    if (left > 0) {
+      const m = String(Math.floor(left / 60000)).padStart(2, '0');
+      const s = String(Math.floor((left % 60000) / 1000)).padStart(2, '0');
+      el.textContent = `— ⏳ ${m}:${s} baqi`;
+    } else {
+      el.textContent = '— ✅ Ab chalao!';
+    }
+  });
+}, 1000);
 
 // Tells all users "Live Draw 5 minute mein shuru hone wala hai".
 // Press this, wait 5 minutes, then press "Live Draw Chalao".
