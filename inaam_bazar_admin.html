@@ -829,7 +829,7 @@ function signInWithGoogle() {
   const provider = new firebase.auth.GoogleAuthProvider();
   provider.setCustomParameters({ login_hint: ADMIN_EMAIL });
   auth.signInWithPopup(provider).then(result => {
-    if (result.user.email !== ADMIN_EMAIL) {
+    if (result.user.email !== ADMIN_EMAIL || !result.user.emailVerified) {
       auth.signOut();
       document.getElementById('loginError').style.display = 'block';
     }
@@ -841,7 +841,7 @@ function signInWithGoogle() {
 function signOut() { auth.signOut(); }
 
 auth.onAuthStateChanged(user => {
-  if (user && user.email === ADMIN_EMAIL) {
+  if (user && user.email === ADMIN_EMAIL && user.emailVerified) {
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('mainApp').style.display = 'block';
     document.getElementById('adminEmail').textContent = user.email;
@@ -902,7 +902,7 @@ async function checkLeaderboardStatus() {
     }
     standingsEl.innerHTML = usersSnap.docs.map((doc, i) => {
       const d = doc.data();
-      return `${i + 1}. ${d.name || 'User'} — ${d.weeklyTicketsEarned} tickets`;
+      return `${i + 1}. ${escHtml(d.name || 'User')} — ${escHtml(d.weeklyTicketsEarned)} tickets`;
     }).join('<br>');
   } catch(e) {
     document.getElementById('leaderboardStatus').textContent = 'Error: ' + e.message;
@@ -1337,17 +1337,17 @@ function renderQuizList() {
 
   document.getElementById('quizQuestionsList').innerHTML = filtered.map(q => {
     const optionsHtml = (q.options || []).map((opt, i) =>
-      `<span style="${i === q.correct ? 'color:#27AE60;font-weight:bold;' : 'color:#9E9E9E;'}">${i === q.correct ? '✓ ' : ''}${opt}</span>`
+      `<span style="${i === q.correct ? 'color:#27AE60;font-weight:bold;' : 'color:#9E9E9E;'}">${i === q.correct ? '✓ ' : ''}${escHtml(opt)}</span>`
     ).join(' &nbsp;•&nbsp; ');
     return `
       <div class="entry-item" style="flex-direction:column;align-items:flex-start;">
         <div style="display:flex;justify-content:space-between;width:100%;align-items:flex-start;">
           <div style="flex:1;">
-            <div class="entry-user">${q.question}</div>
+            <div class="entry-user">${escHtml(q.question)}</div>
             <div class="entry-detail" style="margin-top:4px;">${optionsHtml}</div>
             <div class="entry-detail" style="margin-top:4px;">${q.used ? '🔴 Used' : '🟢 Available'}</div>
           </div>
-          <button class="btn btn-delete" style="padding:6px 10px;font-size:11px;margin-left:8px;" onclick="deleteQuizQuestion('${q.id}')">🗑️</button>
+          <button class="btn btn-delete" style="padding:6px 10px;font-size:11px;margin-left:8px;" data-id="${escHtml(q.id)}" onclick="deleteQuizQuestion(this.dataset.id)">🗑️</button>
         </div>
       </div>`;
   }).join('');
@@ -1408,16 +1408,16 @@ async function checkExpiredWins() {
       return `
         <div class="draw-card" style="border-color:rgba(231,76,60,0.5);">
           <div class="draw-card-header">
-            <div class="draw-emoji">${d.prizeEmoji || '🎁'}</div>
+            <div class="draw-emoji">${escHtml(d.prizeEmoji || '🎁')}</div>
             <div class="draw-info">
-              <div class="draw-name">${d.prizeName}</div>
-              <div class="draw-desc">Winner: ${d.winnerName || 'Unknown'} (claim nahi kiya)</div>
+              <div class="draw-name">${escHtml(d.prizeName)}</div>
+              <div class="draw-desc">Winner: ${escHtml(d.winnerName || 'Unknown')} (claim nahi kiya)</div>
               <div class="date-passed">⚠️ Deadline guzar gaya: ${deadlineStr}</div>
             </div>
           </div>
           <div class="draw-actions">
-            <button class="btn btn-winner" onclick="rerollExpiredWinner('${doc.id}')">🔄 Naya Winner Chuno</button>
-            <button class="btn btn-delete" onclick="dismissExpiredWin('${doc.id}')">🗑️ Dismiss (Hide)</button>
+            <button class="btn btn-winner" data-id="${escHtml(doc.id)}" onclick="rerollExpiredWinner(this.dataset.id)">🔄 Naya Winner Chuno</button>
+            <button class="btn btn-delete" data-id="${escHtml(doc.id)}" onclick="dismissExpiredWin(this.dataset.id)">🗑️ Dismiss (Hide)</button>
           </div>
         </div>`;
     }).join('');
@@ -1515,18 +1515,21 @@ function renderProofs() {
 
   document.getElementById('proofsList').innerHTML = filtered.map(p => {
     const color = statusColors[p.status] || '#9E9E9E';
-    const label = statusLabels[p.status] || p.status;
+    const label = escHtml(statusLabels[p.status] || p.status);
     const submittedStr = p.submittedAt ? new Date(p.submittedAt.seconds * 1000).toLocaleString('en-PK') : '-';
     const isVideo = p.type === 'video';
-    const mediaHtml = isVideo
-      ? `<video src="${p.fileUrl}" controls style="width:100%;max-height:300px;border-radius:8px;background:#000;"></video>`
-      : `<img src="${p.fileUrl}" style="width:100%;max-height:300px;object-fit:contain;border-radius:8px;background:#000;">`;
+    const fileUrl = safeUrl(p.fileUrl);
+    const mediaHtml = !fileUrl
+      ? `<div class="loading" style="padding:16px;">⚠️ File link sahi nahi hai</div>`
+      : isVideo
+      ? `<video src="${escHtml(fileUrl)}" controls style="width:100%;max-height:300px;border-radius:8px;background:#000;"></video>`
+      : `<img src="${escHtml(fileUrl)}" style="width:100%;max-height:300px;object-fit:contain;border-radius:8px;background:#000;">`;
 
     return `
       <div class="draw-card">
         <div class="draw-card-header">
           <div class="draw-info">
-            <div class="draw-name">${p.prizeName || 'Prize'} — ${isVideo ? '🎥 Video' : '📸 Photo'}</div>
+            <div class="draw-name">${escHtml(p.prizeName || 'Prize')} — ${isVideo ? '🎥 Video' : '📸 Photo'}</div>
             <div class="draw-desc">Submitted: ${submittedStr}</div>
           </div>
           <span class="status-badge" style="background:${color}22;color:${color};border:1px solid ${color}66;">${label}</span>
@@ -1534,16 +1537,20 @@ function renderProofs() {
         <div style="margin-bottom:12px;">${mediaHtml}</div>
         ${p.status === 'pending' ? `
         <div class="draw-actions">
-          <button class="btn btn-confirm" style="background:#27AE60;color:white;" onclick="approveProof('${p.id}', '${p.userId}', '${p.type}')">✅ Approve (+${PROOF_REWARDS[p.type] || 0} tickets)</button>
-          <button class="btn" style="background:rgba(52,152,219,0.2);color:#3498DB;border:1px solid rgba(52,152,219,0.4);" onclick="requestReupload('${p.id}', '${p.userId}', '${p.type}')">🔄 Re-upload</button>
-          <button class="btn btn-delete" onclick="rejectProof('${p.id}')">❌ Reject</button>
+          <button class="btn btn-confirm" style="background:#27AE60;color:white;" data-id="${escHtml(p.id)}" onclick="approveProof(this.dataset.id)">✅ Approve (+${PROOF_REWARDS[isVideo ? 'video' : 'photo']} tickets)</button>
+          <button class="btn" style="background:rgba(52,152,219,0.2);color:#3498DB;border:1px solid rgba(52,152,219,0.4);" data-id="${escHtml(p.id)}" onclick="requestReupload(this.dataset.id)">🔄 Re-upload</button>
+          <button class="btn btn-delete" data-id="${escHtml(p.id)}" onclick="rejectProof(this.dataset.id)">❌ Reject</button>
         </div>` : ''}
       </div>`;
   }).join('');
 }
 
-async function approveProof(proofId, userId, type) {
-  const reward = PROOF_REWARDS[type] || 0;
+async function approveProof(proofId) {
+  const proof = allProofsCache.find(x => x.id === proofId);
+  if (!proof || !proof.userId) { showToast('❌ Proof nahi mila, page refresh karo', true); return; }
+  const userId = proof.userId;
+  const type = proof.type === 'video' ? 'video' : 'photo';
+  const reward = PROOF_REWARDS[type];
   if (!confirm(`Approve karna chahte hain? User ko +${reward} tickets milenge.`)) return;
   try {
     await db.collection('winner_proofs').doc(proofId).update({
@@ -1577,7 +1584,11 @@ async function approveProof(proofId, userId, type) {
 
 const REUPLOAD_WINDOW_DAYS = 7; // fresh time the user gets to upload again
 
-async function requestReupload(proofId, userId, type) {
+async function requestReupload(proofId) {
+  const proof = allProofsCache.find(x => x.id === proofId);
+  if (!proof || !proof.userId) { showToast('❌ Proof nahi mila, page refresh karo', true); return; }
+  const userId = proof.userId;
+  const type = proof.type === 'video' ? 'video' : 'photo';
   const reason = prompt('User ko wajah batao (yeh unko app mein dikhegi):', 'Photo/video clear nahi hai, dobara upload karein.');
   if (reason === null) return;
   const cleanReason = reason.trim() || 'Dobara upload karein.';
@@ -1684,16 +1695,16 @@ function renderClaims() {
 
   document.getElementById('claimsList').innerHTML = filtered.map(c => {
     const color = statusColors[c.status] || '#9E9E9E';
-    const label = statusLabels[c.status] || c.status;
+    const label = escHtml(statusLabels[c.status] || c.status);
     const submittedStr = c.submittedAt ? new Date(c.submittedAt.seconds * 1000).toLocaleString('en-PK') : '-';
     const deadlineStr = c.claimDeadline ? new Date(c.claimDeadline.seconds * 1000).toLocaleString('en-PK') : '-';
-    const waLink = c.phone ? `https://wa.me/${c.phone.replace(/[^0-9]/g, '')}` : '#';
+    const waLink = c.phone ? `https://wa.me/${String(c.phone).replace(/[^0-9]/g, '')}` : '#';
 
     return `
       <div class="draw-card">
         <div class="draw-card-header">
           <div class="draw-info">
-            <div class="draw-name">${c.fullName || 'Unknown'} — ${c.prizeName || ''}</div>
+            <div class="draw-name">${escHtml(c.fullName || 'Unknown')} — ${escHtml(c.prizeName || '')}</div>
             <div class="draw-desc">Submitted: ${submittedStr}</div>
             <div class="draw-desc">Deadline: ${deadlineStr}</div>
           </div>
@@ -1702,16 +1713,16 @@ function renderClaims() {
         <div class="draw-stats" style="grid-template-columns: repeat(1, 1fr);">
           <div class="draw-stat" style="text-align:left;padding:10px;">
             <div style="font-size:11px;color:#9E9E9E;">📱 Phone</div>
-            <div style="font-size:14px;color:white;font-weight:bold;">${c.phone || '-'}</div>
+            <div style="font-size:14px;color:white;font-weight:bold;">${escHtml(c.phone || '-')}</div>
           </div>
         </div>
         <div style="background:rgba(0,0,0,0.2);border-radius:8px;padding:10px;margin-bottom:12px;">
           <div style="font-size:11px;color:#9E9E9E;margin-bottom:4px;">📍 Address</div>
-          <div style="font-size:13px;color:white;">${c.city || ''} — ${c.address || ''}</div>
+          <div style="font-size:13px;color:white;">${escHtml(c.city || '')} — ${escHtml(c.address || '')}</div>
         </div>
         <div class="draw-actions">
           <a href="${waLink}" target="_blank" class="btn" style="background:#25D366;color:white;text-decoration:none;">💬 WhatsApp</a>
-          <select class="form-input" style="width:auto;padding:8px;" onchange="updateClaimStatus('${c.id}', this.value)">
+          <select class="form-input" style="width:auto;padding:8px;" data-id="${escHtml(c.id)}" onchange="updateClaimStatus(this.dataset.id, this.value)">
             <option value="">Status Badlein...</option>
             <option value="pending_info" ${c.status === 'pending_info' ? 'selected' : ''}>⏳ Pending Review</option>
             <option value="reviewing" ${c.status === 'reviewing' ? 'selected' : ''}>🔍 Reviewing</option>
@@ -1876,10 +1887,10 @@ function buildCompactRow(draw) {
   return `
     <div class="draw-compact" onclick="toggleExpand('${draw.id}')">
       <div style="display:flex;align-items:center;gap:10px;min-width:0;">
-        <span style="font-size:20px;">${draw.prizeEmoji || '🎁'}</span>
+        <span style="font-size:20px;">${escHtml(draw.prizeEmoji || '🎁')}</span>
         <div style="min-width:0;">
-          <div style="font-size:13px;font-weight:bold;color:white;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${draw.prizeName}</div>
-          <div style="font-size:11px;color:#9E9E9E;">🏆 ${draw.winnerName || '-'} • ${dateStr}</div>
+          <div style="font-size:13px;font-weight:bold;color:white;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(draw.prizeName)}</div>
+          <div style="font-size:11px;color:#9E9E9E;">🏆 ${escHtml(draw.winnerName || '-')} • ${dateStr}</div>
         </div>
       </div>
       <span style="font-size:11px;color:#9E9E9E;flex-shrink:0;">▼ Details</span>
@@ -1898,17 +1909,17 @@ function buildDrawCard(draw, showCollapse) {
   const winnerBox = (isCompleted || isPending) && draw.winnerName ? `
     <div class="winner-box" style="${isPending ? 'background:rgba(155,89,182,0.1);border-color:rgba(155,89,182,0.4);' : ''}">
       <div class="winner-box-title" style="${isPending ? 'color:#9B59B6;' : ''}">${isPending ? '⏳ WINNER SELECTED — Live Draw Pending' : '🏆 WINNER'}</div>
-      <div class="winner-name">${draw.winnerName}</div>
-      <div class="winner-detail">${draw.winnerEmail || ''}</div>
+      <div class="winner-name">${escHtml(draw.winnerName)}</div>
+      <div class="winner-detail">${escHtml(draw.winnerEmail || '')}</div>
     </div>` : '';
 
   return `
     <div class="draw-card">
       <div class="draw-card-header">
-        <div class="draw-emoji">${draw.prizeEmoji || '🎁'}</div>
+        <div class="draw-emoji">${escHtml(draw.prizeEmoji || '🎁')}</div>
         <div class="draw-info">
-          <div class="draw-name">${draw.prizeName}</div>
-          <div class="draw-desc">${draw.prizeDescription || ''}</div>
+          <div class="draw-name">${escHtml(draw.prizeName)}</div>
+          <div class="draw-desc">${escHtml(draw.prizeDescription || '')}</div>
           <div class="draw-value">PKR ${(draw.prizeValue || 0).toLocaleString()}</div>
           <div class="${dateClass}">${dateNote}</div>
         </div>
@@ -1917,26 +1928,27 @@ function buildDrawCard(draw, showCollapse) {
         </span>
       </div>
       <div class="draw-stats">
-        <div class="draw-stat"><div class="draw-stat-num">${draw.currentEntries || 0}</div><div class="draw-stat-label">Entries</div></div>
-        <div class="draw-stat"><div class="draw-stat-num">${draw.ticketCost || 15}</div><div class="draw-stat-label">1st Cost</div></div>
-        <div class="draw-stat"><div class="draw-stat-num">${draw.isTargetBased ? draw.targetPlayers : 'Date'}</div><div class="draw-stat-label">${draw.isTargetBased ? 'Target' : 'Based'}</div></div>
+        <div class="draw-stat"><div class="draw-stat-num">${escHtml(draw.currentEntries || 0)}</div><div class="draw-stat-label">Entries</div></div>
+        <div class="draw-stat"><div class="draw-stat-num">${escHtml(draw.ticketCost || 15)}</div><div class="draw-stat-label">1st Cost</div></div>
+        <div class="draw-stat"><div class="draw-stat-num">${draw.isTargetBased ? escHtml(draw.targetPlayers) : 'Date'}</div><div class="draw-stat-label">${draw.isTargetBased ? 'Target' : 'Based'}</div></div>
       </div>
       ${winnerBox}
       <div class="draw-actions">
-        <button class="btn btn-entries" onclick="viewEntries('${draw.id}', '${draw.prizeName}')">👥 Entries</button>
-        <button class="btn" style="background:rgba(52,152,219,0.2);color:#3498DB;border:1px solid rgba(52,152,219,0.4);" onclick='showEditDrawModal(${JSON.stringify(draw)})'>✏️ Edit</button>
+        <button class="btn btn-entries" onclick="viewEntries('${draw.id}')">👥 Entries</button>
+        <button class="btn" style="background:rgba(52,152,219,0.2);color:#3498DB;border:1px solid rgba(52,152,219,0.4);" onclick="showEditDrawModal('${draw.id}')">✏️ Edit</button>
         ${isActive && !isPending ? `<button class="btn btn-winner" onclick="selectWinner('${draw.id}')">🏆 Winner Chuno</button>` : ''}
-        ${isPending ? `<button class="btn" style="background:rgba(155,89,182,0.3);color:#9B59B6;border:1px solid rgba(155,89,182,0.5);" onclick="startLiveDraw('${draw.id}', '${draw.prizeName}', '${draw.prizeEmoji || '🎁'}', '${draw.winnerName}')">🎬 Live Draw Chalao</button>` : ''}
-        ${isCompleted && draw.winnerName ? `<button class="btn" style="background:rgba(155,89,182,0.3);color:#9B59B6;border:1px solid rgba(155,89,182,0.5);" onclick="startLiveDraw('${draw.id}', '${draw.prizeName}', '${draw.prizeEmoji || '🎁'}', '${draw.winnerName}')">🎬 Live Draw Chalao</button>` : ''}
-        ${isActive && !isPending ? `<button class="btn" style="background:${draw.isFeatured ? 'rgba(240,165,0,0.3)' : 'rgba(255,255,255,0.1)'}; color:${draw.isFeatured ? '#F0A500' : '#fff'}; border:1px solid ${draw.isFeatured ? '#F0A500' : 'rgba(255,255,255,0.2)'};" onclick="toggleFeatured('${draw.id}', ${draw.isFeatured})">${draw.isFeatured ? '⭐ Featured' : '☆ Feature Karo'}</button>` : ''}
-        <button class="btn btn-delete" onclick="deleteDraw('${draw.id}', '${draw.prizeName}')">🗑️ Delete</button>
+        ${isPending ? `<button class="btn" style="background:rgba(155,89,182,0.3);color:#9B59B6;border:1px solid rgba(155,89,182,0.5);" onclick="startLiveDraw('${draw.id}')">🎬 Live Draw Chalao</button>` : ''}
+        ${isCompleted && draw.winnerName ? `<button class="btn" style="background:rgba(155,89,182,0.3);color:#9B59B6;border:1px solid rgba(155,89,182,0.5);" onclick="startLiveDraw('${draw.id}')">🎬 Live Draw Chalao</button>` : ''}
+        ${isActive && !isPending ? `<button class="btn" style="background:${draw.isFeatured ? 'rgba(240,165,0,0.3)' : 'rgba(255,255,255,0.1)'}; color:${draw.isFeatured ? '#F0A500' : '#fff'}; border:1px solid ${draw.isFeatured ? '#F0A500' : 'rgba(255,255,255,0.2)'};" onclick="toggleFeatured('${draw.id}', ${draw.isFeatured === true})">${draw.isFeatured ? '⭐ Featured' : '☆ Feature Karo'}</button>` : ''}
+        <button class="btn btn-delete" onclick="deleteDraw('${draw.id}')">🗑️ Delete</button>
         ${showCollapse ? `<button class="btn" style="background:rgba(255,255,255,0.08);color:#9E9E9E;" onclick="toggleExpand('${draw.id}')">▲ Collapse</button>` : ''}
       </div>
     </div>`;
 }
 
 // ── View Entries ──────────────────────────────────────────────────────────────
-async function viewEntries(drawId, drawName) {
+async function viewEntries(drawId) {
+  const drawName = (findDraw(drawId) || {}).prizeName || 'Draw';
   document.getElementById('entriesModalTitle').textContent = '👥 ' + drawName + ' — Entries';
   document.getElementById('entriesList').innerHTML = '<div class="loading">Loading...</div>';
   document.getElementById('entriesModal').classList.add('show');
@@ -1955,7 +1967,7 @@ async function viewEntries(drawId, drawName) {
       const e = doc.data();
       const user = userMap[e.userId] || {};
       const ts = e.timestamp ? new Date(e.timestamp.seconds * 1000).toLocaleString('en-PK') : '';
-      return `<div class="entry-item"><div><div class="entry-user">${user.name || 'Unknown'}</div><div class="entry-detail">Entry #${e.entryNumber || '?'} • ${ts}</div></div><div class="entry-tickets">${e.ticketsSpent || 0} tickets</div></div>`;
+      return `<div class="entry-item"><div><div class="entry-user">${escHtml(user.name || 'Unknown')}</div><div class="entry-detail">Entry #${escHtml(e.entryNumber || '?')} • ${ts}</div></div><div class="entry-tickets">${escHtml(e.ticketsSpent || 0)} tickets</div></div>`;
     }).join('');
   } catch(e) {
     document.getElementById('entriesList').innerHTML = '<div class="loading">Error: ' + e.message + '</div>';
@@ -2130,7 +2142,7 @@ async function loadPolls() {
     document.getElementById('pollsList').innerHTML = snap.docs.map(doc => {
       const p = doc.data();
       const isActive = p.status === 'active';
-      const totalVotes = Object.values(p.votes || {}).reduce((a,b) => a+b, 0);
+      const totalVotes = Object.values(p.votes || {}).reduce((a,b) => a + (Number(b) || 0), 0);
       const endsAt = p.endsAt ? new Date(p.endsAt.seconds * 1000) : null;
       let timerStr = '';
       if (isActive) {
@@ -2148,10 +2160,10 @@ async function loadPolls() {
         }
       }
       const optionsHtml = (p.options || []).map(o => {
-        const v = (p.votes || {})[o.id] || 0;
+        const v = Number((p.votes || {})[o.id]) || 0;
         const pct = totalVotes === 0 ? 0 : ((v / totalVotes) * 100).toFixed(0);
         return `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.05);">
-          <span>${o.emoji} ${o.name}</span>
+          <span>${escHtml(o.emoji)} ${escHtml(o.name)}</span>
           <span style="color:#F5C518;font-weight:bold;">${v} votes (${pct}%)</span>
         </div>`;
       }).join('');
@@ -2159,7 +2171,7 @@ async function loadPolls() {
         <div class="draw-card">
           <div class="draw-card-header">
             <div class="draw-info">
-              <div class="draw-name">${p.title}</div>
+              <div class="draw-name">${escHtml(p.title)}</div>
               <div class="draw-desc">${totalVotes} total votes ${timerStr ? '• ' + timerStr : ''}</div>
             </div>
             <span class="status-badge ${isActive ? 'status-active' : 'status-completed'}">${isActive ? '🟢 Active' : '⏹️ Closed'}</span>
@@ -2256,7 +2268,9 @@ async function createDraw() {
 
 // ── Edit Draw ─────────────────────────────────────────────────────────────────
 let editingDrawId = null;
-function showEditDrawModal(draw) {
+function showEditDrawModal(drawId) {
+  const draw = findDraw(drawId);
+  if (!draw) { showToast('❌ Draw nahi mila, page refresh karo', true); return; }
   editingDrawId = draw.id;
   document.getElementById('editEmoji').value = draw.prizeEmoji || '🎁';
   document.getElementById('editPrizeName').value = draw.prizeName || '';
@@ -2363,7 +2377,12 @@ async function sendLiveDrawPushes(drawId, prizeName) {
   }
 }
 
-async function startLiveDraw(drawId, prizeName, prizeEmoji, winnerName) {
+async function startLiveDraw(drawId) {
+  const draw = findDraw(drawId);
+  if (!draw) { showToast('❌ Draw nahi mila, page refresh karo', true); return; }
+  const prizeName = draw.prizeName || '';
+  const prizeEmoji = draw.prizeEmoji || '🎁';
+  const winnerName = draw.winnerName || '';
   if (!confirm(`Live Draw shuru karein?\n\nPrize: ${prizeName}\nWinner: ${winnerName}`)) return;
   try {
     const existing = await db.collection('live_draws').where('status', '==', 'active').get();
@@ -2421,26 +2440,37 @@ async function loadPendingReferrals() {
       try { const uDoc = await db.collection('users').doc(uid).get(); if (uDoc.exists) userMap[uid] = uDoc.data(); } catch(e) {}
     }
 
+    pendingReferralsCache = {};
+    items.forEach(r => {
+      pendingReferralsCache[r.id] = {
+        referrerId: r.referrerId,
+        newUserId: r.newUserId,
+        referrerName: (userMap[r.referrerId] || {}).name || 'Unknown',
+        newUserName: (userMap[r.newUserId] || {}).name || 'Unknown',
+      };
+    });
+
     document.getElementById('pendingReferralsList').innerHTML = `
       <div style="max-height:280px;overflow-y:auto;">
         ${items.map(r => {
-          const referrerName = (userMap[r.referrerId] || {}).name || 'Unknown';
-          const newUserName = (userMap[r.newUserId] || {}).name || 'Unknown';
+          const referrerName = escHtml((userMap[r.referrerId] || {}).name || 'Unknown');
+          const newUserName = escHtml((userMap[r.newUserId] || {}).name || 'Unknown');
+          const refId = escHtml(r.id);
           const referrerRow = r.referrerRewarded === false ? `
             <div style="display:flex;gap:4px;margin-bottom:4px;align-items:center;">
-              <span style="flex:1;font-size:10px;color:#9E9E9E;">Referrer: ${referrerName} (+${r.ticketsForReferrer})</span>
-              <button style="background:#27AE60;color:white;border:none;padding:4px 8px;border-radius:5px;font-size:10px;cursor:pointer;" onclick="awardReferrerRescue('${r.id}', '${r.referrerId}', ${r.ticketsForReferrer}, '${referrerName}')">✅ Award</button>
+              <span style="flex:1;font-size:10px;color:#9E9E9E;">Referrer: ${referrerName} (+${REFERRER_REWARD})</span>
+              <button style="background:#27AE60;color:white;border:none;padding:4px 8px;border-radius:5px;font-size:10px;cursor:pointer;" data-id="${refId}" onclick="awardReferrerRescue(this.dataset.id)">✅ Award</button>
             </div>` : '';
           const newUserRow = r.newUserRewarded === false ? `
             <div style="display:flex;gap:4px;margin-bottom:4px;align-items:center;">
-              <span style="flex:1;font-size:10px;color:#9E9E9E;">Naya user: ${newUserName} (+${r.ticketsForNewUser})</span>
-              <button style="background:#27AE60;color:white;border:none;padding:4px 8px;border-radius:5px;font-size:10px;cursor:pointer;" onclick="awardNewUserRescue('${r.id}', '${r.newUserId}', ${r.ticketsForNewUser}, '${newUserName}')">✅ Award</button>
+              <span style="flex:1;font-size:10px;color:#9E9E9E;">Naya user: ${newUserName} (+${NEW_USER_REWARD})</span>
+              <button style="background:#27AE60;color:white;border:none;padding:4px 8px;border-radius:5px;font-size:10px;cursor:pointer;" data-id="${refId}" onclick="awardNewUserRescue(this.dataset.id)">✅ Award</button>
             </div>` : '';
           return `<div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.08);">
             <div style="font-size:12px;font-weight:bold;color:white;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${referrerName} → ${newUserName}</div>
-            <div style="font-size:10px;color:#9E9E9E;margin-bottom:6px;">${r.referrerCode || ''}</div>
+            <div style="font-size:10px;color:#9E9E9E;margin-bottom:6px;">${escHtml(r.referrerCode || '')}</div>
             ${referrerRow}${newUserRow}
-            <button style="width:100%;background:rgba(231,76,60,0.2);color:#E74C3C;border:1px solid rgba(231,76,60,0.4);padding:4px;border-radius:5px;font-size:10px;cursor:pointer;margin-top:2px;" onclick="rejectReferral('${r.id}', '${referrerName}')">❌ Reject Both</button>
+            <button style="width:100%;background:rgba(231,76,60,0.2);color:#E74C3C;border:1px solid rgba(231,76,60,0.4);padding:4px;border-radius:5px;font-size:10px;cursor:pointer;margin-top:2px;" data-id="${refId}" onclick="rejectReferral(this.dataset.id)">❌ Reject Both</button>
           </div>`;
         }).join('')}
       </div>`;
@@ -2449,7 +2479,8 @@ async function loadPendingReferrals() {
   }
 }
 
-async function rejectReferral(refDocId, name) {
+async function rejectReferral(refDocId) {
+  const name = (pendingReferralsCache[refDocId] || {}).referrerName || 'Is user';
   if (!confirm(`${name} ka referral reject/delete karna chahte hain?`)) return;
   try {
     await db.collection('pending_referrals').doc(refDocId).update({
@@ -2461,9 +2492,20 @@ async function rejectReferral(refDocId, name) {
   } catch(e) { showToast('❌ Error: ' + e.message, true); }
 }
 
-async function awardReferrerRescue(refDocId, referrerId, tickets, name) {
+async function awardReferrerRescue(refDocId) {
+  const info = pendingReferralsCache[refDocId];
+  if (!info || !info.referrerId) { showToast('❌ Referral nahi mila, page refresh karo', true); return; }
+  const referrerId = info.referrerId;
+  const name = info.referrerName;
+  const tickets = REFERRER_REWARD; // fixed amount — never the number saved in the record
   if (!confirm(`${name} (referrer) ko +${tickets} tickets dena chahte hain?`)) return;
   try {
+    const fresh = await db.collection('pending_referrals').doc(refDocId).get();
+    if (!fresh.exists || fresh.data().referrerRewarded === true || fresh.data().status === 'rejected') {
+      showToast('⚠️ Yeh referral pehle hi handle ho chuka hai', true);
+      loadPendingReferrals();
+      return;
+    }
     await db.collection('users').doc(referrerId).update({
       'tickets': firebase.firestore.FieldValue.increment(tickets),
       'weeklyTicketsEarned': firebase.firestore.FieldValue.increment(tickets),
@@ -2489,9 +2531,20 @@ async function awardReferrerRescue(refDocId, referrerId, tickets, name) {
   } catch(e) { showToast('❌ Error: ' + e.message, true); }
 }
 
-async function awardNewUserRescue(refDocId, newUserId, tickets, name) {
+async function awardNewUserRescue(refDocId) {
+  const info = pendingReferralsCache[refDocId];
+  if (!info || !info.newUserId) { showToast('❌ Referral nahi mila, page refresh karo', true); return; }
+  const newUserId = info.newUserId;
+  const name = info.newUserName;
+  const tickets = NEW_USER_REWARD; // fixed amount — never the number saved in the record
   if (!confirm(`${name} (naya user) ko +${tickets} tickets dena chahte hain?`)) return;
   try {
+    const fresh = await db.collection('pending_referrals').doc(refDocId).get();
+    if (!fresh.exists || fresh.data().newUserRewarded === true || fresh.data().status === 'rejected') {
+      showToast('⚠️ Yeh referral pehle hi handle ho chuka hai', true);
+      loadPendingReferrals();
+      return;
+    }
     await db.collection('users').doc(newUserId).update({
       'tickets': firebase.firestore.FieldValue.increment(tickets),
       'weeklyTicketsEarned': firebase.firestore.FieldValue.increment(tickets),
@@ -2522,7 +2575,8 @@ async function toggleFeatured(drawId, currentFeatured) {
 }
 
 // ── Delete Draw ───────────────────────────────────────────────────────────────
-async function deleteDraw(drawId, name) {
+async function deleteDraw(drawId) {
+  const name = (findDraw(drawId) || {}).prizeName || 'Draw';
   if (!confirm('Kya aap "' + name + '" delete karna chahte hain?')) return;
   try {
     const drawDoc = await db.collection('draws').doc(drawId).get();
@@ -2627,7 +2681,7 @@ async function runSuspiciousScan() {
           <div style="margin-bottom:10px;">
             ${flags.map(f => `<div style="font-size:12px;color:#F0A500;margin-bottom:3px;">⚠️ ${escHtml(f)}</div>`).join('')}
           </div>
-          <div class="draw-desc" style="margin-bottom:10px;">Tickets: ${u.tickets || 0} • Is hafte: ${u.weeklyTicketsEarned || 0} • Referrals: ${u.totalReferrals || 0} • Ads: ${u.totalAdsWatched || 0}</div>
+          <div class="draw-desc" style="margin-bottom:10px;">Tickets: ${escHtml(u.tickets || 0)} • Is hafte: ${escHtml(u.weeklyTicketsEarned || 0)} • Referrals: ${escHtml(u.totalReferrals || 0)} • Ads: ${escHtml(u.totalAdsWatched || 0)}</div>
           <button class="btn btn-entries" onclick="openUserInLookup('${escHtml(u.id)}')">🔎 Lookup Mein Kholo</button>
         </div>`).join('');
   } catch(e) {
@@ -2930,6 +2984,24 @@ function openUserInLookup(uid) {
 
 let userSearchCache = {};
 
+// Fixed referral rewards used by the admin "Award" buttons
+const REFERRER_REWARD = 15;
+const NEW_USER_REWARD = 10;
+let pendingReferralsCache = {};
+
+// Looks up a draw from the list already loaded on the page
+function findDraw(drawId) {
+  return allDrawsCache.find(d => d.id === drawId) || null;
+}
+
+// Only allows normal https links (blocks javascript: and other tricks)
+function safeUrl(u) {
+  try {
+    const url = new URL(String(u || ''));
+    return url.protocol === 'https:' ? url.href : '';
+  } catch(e) { return ''; }
+}
+
 function escHtml(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
@@ -2977,12 +3049,12 @@ function renderUserResults() {
           <span class="status-badge ${banned ? '' : 'status-active'}" style="${banned ? 'background:rgba(231,76,60,0.2);color:#E74C3C;border:1px solid rgba(231,76,60,0.4);' : ''}">${banned ? '🚫 Banned' : '🟢 Active'}</span>
         </div>
         <div class="draw-stats">
-          <div class="draw-stat"><div class="draw-stat-num">${u.tickets || 0}</div><div class="draw-stat-label">Tickets</div></div>
-          <div class="draw-stat"><div class="draw-stat-num">${u.weeklyTicketsEarned || 0}</div><div class="draw-stat-label">Is Hafte Kamaye</div></div>
-          <div class="draw-stat"><div class="draw-stat-num">${u.totalWins || 0}</div><div class="draw-stat-label">Wins</div></div>
-          <div class="draw-stat"><div class="draw-stat-num">${u.totalDrawsEntered || 0}</div><div class="draw-stat-label">Entries</div></div>
-          <div class="draw-stat"><div class="draw-stat-num">${u.totalReferrals || 0}</div><div class="draw-stat-label">Referrals</div></div>
-          <div class="draw-stat"><div class="draw-stat-num">${u.streak || 0}</div><div class="draw-stat-label">Streak</div></div>
+          <div class="draw-stat"><div class="draw-stat-num">${escHtml(u.tickets || 0)}</div><div class="draw-stat-label">Tickets</div></div>
+          <div class="draw-stat"><div class="draw-stat-num">${escHtml(u.weeklyTicketsEarned || 0)}</div><div class="draw-stat-label">Is Hafte Kamaye</div></div>
+          <div class="draw-stat"><div class="draw-stat-num">${escHtml(u.totalWins || 0)}</div><div class="draw-stat-label">Wins</div></div>
+          <div class="draw-stat"><div class="draw-stat-num">${escHtml(u.totalDrawsEntered || 0)}</div><div class="draw-stat-label">Entries</div></div>
+          <div class="draw-stat"><div class="draw-stat-num">${escHtml(u.totalReferrals || 0)}</div><div class="draw-stat-label">Referrals</div></div>
+          <div class="draw-stat"><div class="draw-stat-num">${escHtml(u.streak || 0)}</div><div class="draw-stat-label">Streak</div></div>
         </div>
         <div class="draw-desc" style="margin-bottom:12px;">Joined: ${fmt(u.createdAt)} • Last login: ${fmt(u.lastLogin)}</div>
         <div class="draw-actions">
