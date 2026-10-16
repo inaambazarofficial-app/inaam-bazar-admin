@@ -802,7 +802,7 @@ async function autoPush(name, ref, data) {
     } else {
       if (!data.userId) return;
       const u = await db.collection('users').doc(data.userId).get();
-      const token = u.exists ? u.data().fcmToken : null;
+      const token = await getFcmToken(data.userId, u.exists ? u.data() : null);
       if (!token) return;
       payload = { token, title: data.title, body: data.body, type: data.type || 'general' };
     }
@@ -967,7 +967,6 @@ async function runWeeklyLeaderboardReset() {
         ranked.push({
           userId: doc.id,
           name: doc.data().name || 'User',
-          email: doc.data().email || '',
           tickets: tickets,
           rank: rank,
         });
@@ -2002,6 +2001,13 @@ function pickRandomAndShow() {
   if (!currentEntries.length) return;
   selectedWinner = currentEntries[Math.floor(Math.random() * currentEntries.length)];
   document.getElementById('winnerName').textContent = selectedWinner.name;
+  const pickedWinner = selectedWinner;
+  getUserPrivate(pickedWinner.userId).then(p => {
+    if (p.email && selectedWinner === pickedWinner) {
+      selectedWinner.email = p.email;
+      document.getElementById('winnerDetail').textContent = p.email + ' • ' + currentEntries.length + ' entries mein se chuna gaya';
+    }
+  });
   document.getElementById('winnerDetail').textContent = (selectedWinner.email || selectedWinner.userId) + ' • ' + currentEntries.length + ' entries mein se chuna gaya';
   document.getElementById('winnerModal').classList.add('show');
 }
@@ -2013,6 +2019,9 @@ async function confirmWinner() {
   closeModal('winnerModal');
   showToast('Winner save ho raha hai...', false);
   try {
+    // draws/winners are public — store only a masked email there
+    const fullWinnerEmail = selectedWinner.email || (await getUserPrivate(selectedWinner.userId)).email || '';
+    const publicWinnerEmail = maskEmail(fullWinnerEmail);
     // Remove any previous winner entry for this draw (handles reroll case)
     const oldWinnersSnap = await db.collection('winners').where('drawId', '==', currentDrawId).get();
     for (const oldDoc of oldWinnersSnap.docs) {
@@ -2027,7 +2036,7 @@ async function confirmWinner() {
       winnerId: selectedWinner.userId,
       winnerName: selectedWinner.name,
       winnerCity: '',
-      winnerEmail: selectedWinner.email || '',
+      winnerEmail: publicWinnerEmail,
       pendingCompletion: true,
       liveDrawPushSent: false,
       claimSubmitted: false,
@@ -2038,7 +2047,7 @@ async function confirmWinner() {
       drawId: currentDrawId,
       userId: selectedWinner.userId,
       winnerName: selectedWinner.name,
-      winnerEmail: selectedWinner.email || '',
+      winnerEmail: publicWinnerEmail,
       prizeName: drawDataForWinner.prizeName || '',
       prizeEmoji: drawDataForWinner.prizeEmoji || '🎁',
       timestamp: firebase.firestore.FieldValue.serverTimestamp(),
@@ -2366,7 +2375,7 @@ async function sendLiveDrawPushes(drawId, prizeName) {
     if (d.winnerId) {
       await new Promise(r => setTimeout(r, 3000));
       const u = await db.collection('users').doc(d.winnerId).get();
-      const token = u.exists ? u.data().fcmToken : null;
+      const token = await getFcmToken(d.winnerId, u.exists ? u.data() : null);
       if (token) {
         await sendPush({
           token,
@@ -2797,6 +2806,7 @@ async function runSuspiciousScan() {
       (b.u.weeklyTicketsEarned || 0) - (a.u.weeklyTicketsEarned || 0));
 
     const total = Object.keys(users).length;
+    for (const f of flagged) f.u = await addPrivateInfo(f.u.id, f.u);
     if (flagged.length === 0) {
       box.innerHTML = `<div class="loading" style="padding:16px;">✅ ${total} users check kiye, koi suspicious activity nahi mili.</div>`;
       return;
@@ -2880,7 +2890,7 @@ async function sendCustomNotification() {
       const name = uDoc.data().name || 'User';
       if (!confirm(`${name} ko yeh notification bhejni hai?\n\n"${title}"\n${body}`)) return;
       const ref = await db.collection('notifications').add({ ...base, userId: uid });
-      const fcmToken = uDoc.data().fcmToken;
+      const fcmToken = await getFcmToken(uid, uDoc.data());
       if (!fcmToken) {
         showToast('⚠️ Is user ka push token nahi mila — sirf save hua', true);
       } else {
@@ -3040,7 +3050,7 @@ async function loadNotifHistory() {
     await Promise.all(uids.map(async uid => {
       try {
         const d = await db.collection('users').doc(uid).get();
-        if (d.exists) userMap[uid] = d.data();
+        if (d.exists) userMap[uid] = await addPrivateInfo(uid, d.data());
       } catch(e) {}
     }));
 
@@ -3137,6 +3147,37 @@ function safeUrl(u) {
   } catch(e) { return ''; }
 }
 
+// ── Private user info (email, phone, push token) lives in users_private ──
+// Only the user and the admin can read it. Old accounts may still have it in
+// "users", so we fall back to that until they log in with the new app.
+const userPrivateCache = {};
+async function getUserPrivate(uid) {
+  if (!uid) return {};
+  if (userPrivateCache[uid]) return userPrivateCache[uid];
+  try {
+    const d = await db.collection('users_private').doc(uid).get();
+    userPrivateCache[uid] = d.exists ? d.data() : {};
+  } catch (e) { userPrivateCache[uid] = {}; }
+  return userPrivateCache[uid];
+}
+async function addPrivateInfo(uid, data) {
+  const p = await getUserPrivate(uid);
+  return { ...data, email: p.email || (data && data.email) || '', fcmToken: p.fcmToken || (data && data.fcmToken) || null };
+}
+async function getFcmToken(uid, publicData) {
+  const p = await getUserPrivate(uid);
+  return p.fcmToken || (publicData && publicData.fcmToken) || null;
+}
+// "zairkhan@gmail.com" -> "za***an@gmail.com" (safe to show publicly)
+function maskEmail(email) {
+  const e = String(email || '');
+  const at = e.indexOf('@');
+  if (at < 1) return '';
+  const name = e.slice(0, at), domain = e.slice(at + 1);
+  if (name.length <= 4) return name[0] + '***@' + domain;
+  return name.slice(0, 2) + '***' + name.slice(-2) + '@' + domain;
+}
+
 function escHtml(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
@@ -3156,8 +3197,16 @@ async function searchUsers() {
     db.collection('users').where('email', '==', term.toLowerCase()).limit(5).get().then(add),
     db.collection('users').where('referralCode', '==', term.toUpperCase()).limit(5).get().then(add),
     db.collection('users').where('name', '>=', term).where('name', '<=', term + '\uf8ff').limit(10).get().then(add),
+    ...[term, term.toLowerCase()].map(e =>
+      db.collection('users_private').where('email', '==', e).limit(5).get().then(async s => {
+        for (const p of s.docs) {
+          const u = await db.collection('users').doc(p.id).get();
+          if (u.exists) found[u.id] = { id: u.id, ...u.data() };
+        }
+      })),
   ].map(p => p.catch(() => {}));
   await Promise.all(jobs);
+  for (const id of Object.keys(found)) found[id] = await addPrivateInfo(id, found[id]);
 
   userSearchCache = found;
   renderUserResults();
