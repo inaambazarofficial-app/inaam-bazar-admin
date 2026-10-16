@@ -2338,6 +2338,12 @@ async function saveEditDraw() {
 // ── Live Draw ─────────────────────────────────────────────────────────────────
 // Sends the "you won" push to the winner and the "result is out" push to
 // everyone, once per draw, at the moment the Live Draw starts.
+// Warn before closing the page while Live Draw notifications are still waiting
+let pushesPending = 0;
+window.addEventListener('beforeunload', (e) => {
+  if (pushesPending > 0) { e.preventDefault(); e.returnValue = ''; }
+});
+
 async function sendLiveDrawPushes(drawId, prizeName) {
   try {
     const drawRef = db.collection('draws').doc(drawId);
@@ -2345,7 +2351,16 @@ async function sendLiveDrawPushes(drawId, prizeName) {
     if (d.liveDrawPushSent === true) return; // already sent (e.g. replaying a draw)
     await drawRef.update({ liveDrawPushSent: true });
 
+    // Everyone first, then the winner's personal message a few seconds later,
+    // so on the winner's phone "Mubarak Ho" is the newest one on top.
+    await sendPush({
+      topic: 'all_users',
+      title: '🎁 Naya Draw Result!',
+      body: `${prizeName} ka winner chun liya gaya hai. Winners Screen mein dekhein!`,
+      type: 'draw_result',
+    });
     if (d.winnerId) {
+      await new Promise(r => setTimeout(r, 3000));
       const u = await db.collection('users').doc(d.winnerId).get();
       const token = u.exists ? u.data().fcmToken : null;
       if (token) {
@@ -2357,12 +2372,6 @@ async function sendLiveDrawPushes(drawId, prizeName) {
         });
       }
     }
-    await sendPush({
-      topic: 'all_users',
-      title: '🎁 Naya Draw Result!',
-      body: `${prizeName} ka winner chun liya gaya hai. Winners Screen mein dekhein!`,
-      type: 'draw_result',
-    });
 
     // Mark the held notification records as sent so the history stays accurate
     const held = [
@@ -2412,7 +2421,17 @@ async function startLiveDraw(drawId) {
     });
     setTimeout(() => loadDashboard(), 800);
     showToast('🎬 Live Draw shuru ho gaya!', false);
-    sendLiveDrawPushes(drawId, prizeName);
+    // Wait until the animation has ended on phones (~22 sec) before sending
+    // notifications, so nobody learns the winner before the reveal.
+    showToast('🔔 Notifications 25 second baad jayengi — page band na karein', false);
+    pushesPending++;
+    setTimeout(async () => {
+      try { await sendLiveDrawPushes(drawId, prizeName); }
+      finally {
+        pushesPending--;
+        showToast('✅ Notifications bhej di gayi', false);
+      }
+    }, 25000);
   } catch(e) { showToast('❌ Error: ' + e.message, true); }
 }
 
