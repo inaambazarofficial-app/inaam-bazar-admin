@@ -2213,11 +2213,13 @@ function showAddDrawModal() {
   document.getElementById('addDrawModal').classList.add('show');
   const dateInput = document.getElementById('newDrawDate');
   if (dateInput && !dateInput.value) {
-    const now = new Date();
-    const yyyy = now.getFullYear();
-    const mm = String(now.getMonth() + 1).padStart(2, '0');
-    const dd = String(now.getDate()).padStart(2, '0');
-    dateInput.value = `${yyyy}-${mm}-${dd}T`;
+    // Uses Firebase's clock (serverNow), so it's right even if the laptop time is wrong.
+    // Fills today's date with the next full hour, e.g. 1:11 AM -> 2:00 AM.
+    const now = new Date(serverNow());
+    now.setMinutes(0, 0, 0);
+    now.setHours(now.getHours() + 1);
+    const pad = (n) => String(n).padStart(2, '0');
+    dateInput.value = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
   }
 }
 
