@@ -2383,15 +2383,34 @@ async function startLiveDraw(drawId) {
   const prizeName = draw.prizeName || '';
   const prizeEmoji = draw.prizeEmoji || '🎁';
   const winnerName = draw.winnerName || '';
+  if (!draw.winnerId || !winnerName) { showToast('❌ Pehle winner select karo', true); return; }
   if (!confirm(`Live Draw shuru karein?\n\nPrize: ${prizeName}\nWinner: ${winnerName}`)) return;
   try {
+    // 1) Finish the draw HERE in the admin panel, not on a user's phone.
+    //    Before, the draw only became "completed" if some phone played the
+    //    whole animation — if no phone did, it stayed "Pending" forever.
+    //    Only done the first time (a replay must not reset the claim deadline).
+    const drawRef = db.collection('draws').doc(drawId);
+    const fresh = (await drawRef.get()).data() || {};
+    if (fresh.pendingCompletion === true || fresh.status !== 'completed') {
+      await drawRef.update({
+        status: 'completed',
+        pendingCompletion: false,
+        completedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        winnerClaimDeadline: firebase.firestore.Timestamp.fromDate(new Date(Date.now() + 48 * 60 * 60 * 1000)), // 2 days to claim
+        claimSubmitted: false,
+      });
+    }
+
+    // 2) Close any older live draw, then start the new animation for all phones
     const existing = await db.collection('live_draws').where('status', '==', 'active').get();
-    for (const doc of existing.docs) await db.collection('live_draws').doc(doc.id).delete();
+    for (const doc of existing.docs) await db.collection('live_draws').doc(doc.id).update({ status: 'completed' });
     await db.collection('live_draws').add({
       drawId, prizeName, prizeEmoji, winnerName,
       status: 'active',
       startedAt: firebase.firestore.FieldValue.serverTimestamp(),
     });
+    setTimeout(() => loadDashboard(), 800);
     showToast('🎬 Live Draw shuru ho gaya!', false);
     sendLiveDrawPushes(drawId, prizeName);
   } catch(e) { showToast('❌ Error: ' + e.message, true); }
