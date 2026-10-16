@@ -3228,7 +3228,7 @@ function renderUserResults() {
           <div class="draw-info">
             <div class="draw-name">${escHtml(u.name || 'User')}</div>
             <div class="draw-desc">${escHtml(u.email || '-')}</div>
-            <div class="draw-desc" style="font-size:11px;word-break:break-all;">UID: ${escHtml(u.id)}</div>
+            <div class="draw-desc" style="font-size:11px;word-break:break-all;">UID: ${escHtml(u.id)}${copyBtn(u.id)}</div>
           </div>
           <span class="status-badge ${banned ? '' : 'status-active'}" style="${banned ? 'background:rgba(231,76,60,0.2);color:#E74C3C;border:1px solid rgba(231,76,60,0.4);' : ''}">${banned ? '🚫 Banned' : '🟢 Active'}</span>
         </div>
