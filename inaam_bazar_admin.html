@@ -846,6 +846,7 @@ auth.onAuthStateChanged(user => {
     document.getElementById('mainApp').style.display = 'block';
     document.getElementById('adminEmail').textContent = user.email;
     loadDashboard();
+    syncServerClock();
   } else {
     document.getElementById('loginScreen').style.display = 'flex';
     document.getElementById('mainApp').style.display = 'none';
@@ -2388,11 +2389,27 @@ async function sendLiveDrawPushes(drawId, prizeName) {
 }
 
 // Updates the "⏳ 04:32 baqi" timer on Live Draw buttons every second
+// Difference between this computer's clock and Firebase's clock, so the
+// timer is right even if the laptop date/time is wrong
+let serverClockOffsetMs = 0;
+async function syncServerClock() {
+  try {
+    const ref = db.collection('config').doc('_time_check');
+    const before = Date.now();
+    await ref.set({ ts: firebase.firestore.FieldValue.serverTimestamp() });
+    const snap = await ref.get();
+    const after = Date.now();
+    const server = snap.data().ts.toDate().getTime();
+    serverClockOffsetMs = server - Math.round((before + after) / 2);
+  } catch (e) { console.error('syncServerClock', e); }
+}
+function serverNow() { return Date.now() + serverClockOffsetMs; }
+
 setInterval(() => {
   document.querySelectorAll('.live-soon-timer').forEach(el => {
     const at = Number(el.dataset.at);
     if (!at) return;
-    const elapsed = Date.now() - at;
+    const elapsed = serverNow() - at;
     const left = 5 * 60 * 1000 - elapsed;
     if (elapsed > 15 * 60 * 1000) { el.textContent = ''; return; }
     if (left > 0) {
@@ -2404,6 +2421,35 @@ setInterval(() => {
     }
   });
 }, 1000);
+
+// Up to 30 real people who entered this draw, as "First L." (winner excluded)
+function shortName(full) {
+  const parts = String(full || '').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return '';
+  const first = parts[0].slice(0, 14);
+  return parts.length > 1 ? `${first} ${parts[parts.length - 1][0].toUpperCase()}.` : first;
+}
+async function getLiveDrawNames(drawId, winnerId) {
+  try {
+    const snap = await db.collection('entries').where('drawId', '==', drawId).limit(300).get();
+    const ids = [...new Set(snap.docs.map(d => d.data().userId).filter(id => id && id !== winnerId))];
+    // shuffle, keep at most 30 people
+    for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; }
+    const picked = ids.slice(0, 30);
+    const names = [];
+    for (const uid of picked) {
+      try {
+        const u = await db.collection('users').doc(uid).get();
+        const n = shortName(u.exists ? u.data().name : '');
+        if (n) names.push(n);
+      } catch (e) {}
+    }
+    return names;
+  } catch (e) {
+    console.error('getLiveDrawNames', e);
+    return [];
+  }
+}
 
 // Tells all users "Live Draw 5 minute mein shuru hone wala hai".
 // Press this, wait 5 minutes, then press "Live Draw Chalao".
@@ -2456,16 +2502,20 @@ async function startLiveDraw(drawId) {
       });
     }
 
-    // 2) Close any older live draw, then start the new animation for all phones
+    // 2) Real entrant names for the scrolling animation (no fake names).
+    //    Short form "Ahmed A." for privacy; the winner is added by the app.
+    const names = await getLiveDrawNames(drawId, draw.winnerId);
+
+    // 3) Close any older live draw, then start the new animation for all phones
     const existing = await db.collection('live_draws').where('status', '==', 'active').get();
     for (const doc of existing.docs) await db.collection('live_draws').doc(doc.id).update({ status: 'completed' });
     await db.collection('live_draws').add({
-      drawId, prizeName, prizeEmoji, winnerName,
+      drawId, prizeName, prizeEmoji, winnerName, names,
       status: 'active',
       startedAt: firebase.firestore.FieldValue.serverTimestamp(),
     });
     setTimeout(() => loadDashboard(), 800);
-    showToast('🎬 Live Draw shuru ho gaya!', false);
+    showToast(`🎬 Live Draw shuru ho gaya! (${names.length} naam bheje)`, false);
     // Wait until the animation has ended on phones (~22 sec) before sending
     // notifications, so nobody learns the winner before the reveal.
     showToast('🔔 Notifications 25 second baad jayengi — page band na karein', false);
