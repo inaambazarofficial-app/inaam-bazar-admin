@@ -483,6 +483,7 @@ Question2|OptA|OptB|OptC|OptD|0"></textarea>
             <option value="user_banned">🚫 User Ban</option>
             <option value="user_unbanned">✅ User Unban</option>
             <option value="winner_selected">🏆 Winner Select</option>
+            <option value="winner_rolled">🎲 Winner Roll</option>
             <option value="proof_approved">✅ Proof Approve</option>
             <option value="proof_rejected">❌ Proof Reject</option>
             <option value="proof_reupload_requested">🔄 Proof Re-upload</option>
@@ -735,11 +736,12 @@ Question2|OptA|OptB|OptC|OptD|0"></textarea>
     </div>
     <div class="winner-confirm">
       <div class="winner-confirm-emoji">🎉</div>
-      <div class="winner-confirm-title">Random Winner Selected!</div>
+      <div class="winner-confirm-title">Fair Random Winner Selected!</div>
       <div class="winner-confirm-name" id="winnerName">-</div>
-      <div class="winner-confirm-detail" id="winnerDetail">-</div>
+      <div class="winner-confirm-detail" id="winnerDetail" style="margin-bottom:8px;">-</div>
+      <div id="winnerRollInfo" style="font-size:13px;margin-bottom:20px;"></div>
       <div class="confirm-actions">
-        <button class="btn-reroll" onclick="rerollWinner()">🔄 Dobara Roll</button>
+        <button class="btn-reroll" onclick="rerollWinner()">🔄 Reroll (wajah zaroori)</button>
         <button class="btn-confirm" onclick="confirmWinner()">✅ Confirm Winner</button>
       </div>
     </div>
@@ -1439,6 +1441,8 @@ async function dismissExpiredWin(drawId) {
 
 async function rerollExpiredWinner(drawId) {
   if (!confirm('Purana winner claim nahi kar saka. Naya winner select karna chahte hain?')) return;
+  winnerRollCount = 0;
+  winnerRollReason = 'expired_unclaimed (purana winner claim nahi kar saka)';
   currentDrawId = drawId;
   currentEntries = [];
   showToast('Entries load ho rahi hain...', false);
@@ -1977,6 +1981,8 @@ async function viewEntries(drawId) {
 
 // ── Winner Selection ──────────────────────────────────────────────────────────
 async function selectWinner(drawId) {
+  winnerRollCount = 0;
+  winnerRollReason = 'first_pick';
   currentDrawId = drawId;
   currentEntries = [];
   showToast('Entries load ho rahi hain...', false);
@@ -1997,9 +2003,43 @@ async function selectWinner(drawId) {
   } catch(e) { showToast('❌ Error: ' + e.message, true); }
 }
 
+// ── Fair winner pick (#12) ──
+// Uses the browser's secure random generator (not Math.random) and
+// throws away the uneven "tail" so every entry has exactly the same chance.
+// Every roll (first pick + rerolls) is saved in admin_audit_log,
+// which can never be edited or deleted.
+let winnerRollCount = 0;
+let winnerRollReason = 'first_pick';
+
+function fairRandomIndex(n) {
+  const limit = Math.floor(4294967296 / n) * n;
+  const buf = new Uint32Array(1);
+  let x;
+  do { crypto.getRandomValues(buf); x = buf[0]; } while (x >= limit);
+  return x % n;
+}
+
 function pickRandomAndShow() {
   if (!currentEntries.length) return;
-  selectedWinner = currentEntries[Math.floor(Math.random() * currentEntries.length)];
+  winnerRollCount++;
+  selectedWinner = { ...currentEntries[fairRandomIndex(currentEntries.length)] };
+  const drawNameForLog = (findDraw(currentDrawId) || {}).prizeName || '';
+  logAudit('winner_rolled', {
+    drawId: currentDrawId,
+    prize: drawNameForLog,
+    roll: winnerRollCount,
+    reason: winnerRollReason,
+    pickedName: selectedWinner.name,
+    pickedUserId: selectedWinner.userId,
+    totalEntries: currentEntries.length,
+  });
+  const rollInfoEl = document.getElementById('winnerRollInfo');
+  if (rollInfoEl) {
+    rollInfoEl.textContent = winnerRollCount === 1
+      ? '🎲 Roll #1 — audit log mein save ho gaya'
+      : '⚠️ Roll #' + winnerRollCount + ' (reroll) — wajah: ' + winnerRollReason;
+    rollInfoEl.style.color = winnerRollCount === 1 ? '#2ECC71' : '#F0A500';
+  }
   document.getElementById('winnerName').textContent = selectedWinner.name;
   const pickedWinner = selectedWinner;
   getUserPrivate(pickedWinner.userId).then(p => {
@@ -2012,7 +2052,13 @@ function pickRandomAndShow() {
   document.getElementById('winnerModal').classList.add('show');
 }
 
-function rerollWinner() { pickRandomAndShow(); }
+function rerollWinner() {
+  const reason = prompt('Dobara roll kyun kar rahe hain?\nWajah likhein — yeh audit log mein hamesha ke liye save hogi.\n(Misal: fake account, banned user, duplicate account)');
+  if (reason === null) return;
+  if (reason.trim().length < 3) { showToast('❌ Reroll ke liye wajah likhna zaroori hai', true); return; }
+  winnerRollReason = reason.trim().substring(0, 200);
+  pickRandomAndShow();
+}
 
 async function confirmWinner() {
   if (!selectedWinner || !currentDrawId) return;
@@ -2060,7 +2106,7 @@ async function confirmWinner() {
       topic: 'all_users', type: 'draw_result', sent: false,
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
     });
-    logAudit('winner_selected', { drawId: currentDrawId, prize: drawDataForWinner.prizeName || '', winnerId: selectedWinner.userId, winnerName: selectedWinner.name });
+    logAudit('winner_selected', { drawId: currentDrawId, prize: drawDataForWinner.prizeName || '', winnerId: selectedWinner.userId, winnerName: selectedWinner.name, totalRolls: winnerRollCount });
     showToast('🏆 Winner confirm! Ab Live Draw Chalao button dekhein.', false);
     setTimeout(() => loadDashboard(), 1500);
   } catch(e) { showToast('❌ Error: ' + e.message, true); }
@@ -2940,6 +2986,7 @@ const AUDIT_LABELS = {
   user_banned: '🚫 User Ban',
   user_unbanned: '✅ User Unban',
   winner_selected: '🏆 Winner Select',
+  winner_rolled: '🎲 Winner Roll',
   proof_approved: '✅ Proof Approve',
   proof_rejected: '❌ Proof Reject',
   proof_reupload_requested: '🔄 Proof Re-upload',
