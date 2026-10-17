@@ -2043,18 +2043,10 @@ async function confirmWinner() {
     });
     const drawSnapForWinner = await db.collection('draws').doc(currentDrawId).get();
     const drawDataForWinner = drawSnapForWinner.data() || {};
-    await db.collection('winners').add({
-      drawId: currentDrawId,
-      userId: selectedWinner.userId,
-      winnerName: selectedWinner.name,
-      winnerEmail: publicWinnerEmail,
-      prizeName: drawDataForWinner.prizeName || '',
-      prizeEmoji: drawDataForWinner.prizeEmoji || '🎁',
-      timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-    });
-    await db.collection('users').doc(selectedWinner.userId).update({
-      totalWins: firebase.firestore.FieldValue.increment(1),
-    });
+    // The public "Latest Winners" record and the user's win count are added
+    // only when the Live Draw starts (startLiveDraw) — not now, so nobody
+    // sees the winner (or a "Winner" achievement) before the reveal.
+    bumpDrawsSignal();
     await db.collection('notifications').add({
       userId: selectedWinner.userId,
       title: '🏆 Mubarak Ho! Aap Ne Jeeta!',
@@ -2267,6 +2259,7 @@ async function createDraw() {
   }
   try {
     await db.collection('draws').add(data);
+    bumpDrawsSignal();
     closeModal('addDrawModal');
     showToast('✅ Naya draw ban gaya!', false);
     await db.collection('broadcast_notifications').add({
@@ -2342,6 +2335,7 @@ async function saveEditDraw() {
   }
   try {
     await db.collection('draws').doc(editingDrawId).update(data);
+    bumpDrawsSignal();
     closeModal('editDrawModal');
     showToast('✅ Draw update ho gaya!', false);
     setTimeout(() => loadDashboard(), 800);
@@ -2462,6 +2456,13 @@ async function getLiveDrawNames(drawId, winnerId) {
   }
 }
 
+// Tells every open app "draws changed — reload Home" (1 small read per user)
+function bumpDrawsSignal() {
+  db.collection('config').doc('draws_signal')
+    .set({ v: firebase.firestore.FieldValue.serverTimestamp() })
+    .catch(e => console.error('bumpDrawsSignal', e));
+}
+
 // Tells all users "Live Draw 5 minute mein shuru hone wala hai".
 // Press this, wait 5 minutes, then press "Live Draw Chalao".
 async function announceLiveDrawSoon(drawId) {
@@ -2511,6 +2512,23 @@ async function startLiveDraw(drawId) {
         winnerClaimDeadline: firebase.firestore.Timestamp.fromDate(new Date(Date.now() + 48 * 60 * 60 * 1000)), // 2 days to claim
         claimSubmitted: false,
       });
+      // Now the winner becomes public: Latest Winners list + win count
+      if (fresh.winnerId) {
+        const oldW = await db.collection('winners').where('drawId', '==', drawId).get();
+        for (const w of oldW.docs) await w.ref.delete();
+        await db.collection('winners').add({
+          drawId,
+          userId: fresh.winnerId,
+          winnerName: fresh.winnerName || '',
+          winnerEmail: fresh.winnerEmail || '',
+          prizeName: fresh.prizeName || '',
+          prizeEmoji: fresh.prizeEmoji || '🎁',
+          timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+        });
+        await db.collection('users').doc(fresh.winnerId).update({
+          totalWins: firebase.firestore.FieldValue.increment(1),
+        });
+      }
     }
 
     // 2) Real entrant names for the scrolling animation (no fake names).
@@ -2525,6 +2543,7 @@ async function startLiveDraw(drawId) {
       status: 'active',
       startedAt: firebase.firestore.FieldValue.serverTimestamp(),
     });
+    bumpDrawsSignal();
     setTimeout(() => loadDashboard(), 800);
     showToast(`🎬 Live Draw shuru ho gaya! (${names.length} naam bheje)`, false);
     // Wait until the animation has ended on phones (~22 sec) before sending
@@ -2713,6 +2732,7 @@ async function awardNewUserRescue(refDocId) {
 async function toggleFeatured(drawId, currentFeatured) {
   try {
     await db.collection('draws').doc(drawId).update({ isFeatured: !currentFeatured });
+    bumpDrawsSignal();
     showToast(currentFeatured ? '☆ Featured hata diya' : '⭐ Featured kar diya!', false);
     setTimeout(() => loadDashboard(), 800);
   } catch(e) { showToast('❌ Error: ' + e.message, true); }
@@ -2735,6 +2755,7 @@ async function deleteDraw(drawId) {
       });
     }
     await db.collection('draws').doc(drawId).delete();
+    bumpDrawsSignal();
     logAudit('draw_deleted', { drawId, prize: name, winner: (drawData && drawData.winnerName) || '' });
     showToast('🗑️ Draw delete ho gaya', false);
     setTimeout(() => loadDashboard(), 800);
