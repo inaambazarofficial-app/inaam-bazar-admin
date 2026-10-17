@@ -2498,7 +2498,21 @@ async function startLiveDraw(drawId) {
   if (!draw.winnerId || !winnerName) { showToast('❌ Pehle winner select karo', true); return; }
   if (!confirm(`Live Draw shuru karein?\n\nPrize: ${prizeName}\nWinner: ${winnerName}`)) return;
   try {
-    // 1) Finish the draw HERE in the admin panel, not on a user's phone.
+    // Order matters: the animation starts on phones FIRST, then the draw is
+    // completed — so the claim popup can't appear before the animation.
+    // 1) Real entrant names for the scrolling animation (no fake names).
+    //    Short form "Ahmed A." for privacy; the winner is added by the app.
+    const names = await getLiveDrawNames(drawId, draw.winnerId);
+
+    // 2) Close any older live draw, then start the new animation for all phones
+    const existing = await db.collection('live_draws').where('status', '==', 'active').get();
+    for (const doc of existing.docs) await db.collection('live_draws').doc(doc.id).update({ status: 'completed' });
+    await db.collection('live_draws').add({
+      drawId, prizeName, prizeEmoji, winnerName, names,
+      status: 'active',
+      startedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    // 3) Finish the draw HERE in the admin panel, not on a user's phone.
     //    Before, the draw only became "completed" if some phone played the
     //    whole animation — if no phone did, it stayed "Pending" forever.
     //    Only done the first time (a replay must not reset the claim deadline).
@@ -2531,18 +2545,6 @@ async function startLiveDraw(drawId) {
       }
     }
 
-    // 2) Real entrant names for the scrolling animation (no fake names).
-    //    Short form "Ahmed A." for privacy; the winner is added by the app.
-    const names = await getLiveDrawNames(drawId, draw.winnerId);
-
-    // 3) Close any older live draw, then start the new animation for all phones
-    const existing = await db.collection('live_draws').where('status', '==', 'active').get();
-    for (const doc of existing.docs) await db.collection('live_draws').doc(doc.id).update({ status: 'completed' });
-    await db.collection('live_draws').add({
-      drawId, prizeName, prizeEmoji, winnerName, names,
-      status: 'active',
-      startedAt: firebase.firestore.FieldValue.serverTimestamp(),
-    });
     bumpDrawsSignal();
     setTimeout(() => loadDashboard(), 800);
     showToast(`🎬 Live Draw shuru ho gaya! (${names.length} naam bheje)`, false);
