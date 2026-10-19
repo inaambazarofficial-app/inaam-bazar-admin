@@ -1065,7 +1065,8 @@ async function runWeeklyLeaderboardReset() {
     await db.collection('config').doc('weekly_leaderboard').set({
       currentWeekKey: weekKey,
       processedAt: firebase.firestore.FieldValue.serverTimestamp(),
-    });
+      rewards: LEADERBOARD_REWARDS,
+    }, { merge: true });
 
     logAudit('leaderboard_reset', { weekKey, winnersRewarded: ranked.length });
     showToast(`✅ Reset complete! ${ranked.length} winners rewarded, sab ke counters reset ho gaye.`, false);
