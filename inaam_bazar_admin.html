@@ -71,6 +71,15 @@
   .form-input { width: 100%; background: rgba(0,0,0,0.3); border: 1px solid rgba(240,165,0,0.3); border-radius: 8px; padding: 10px 14px; color: white; font-size: 14px; outline: none; }
   .form-input:focus { border-color: #F0A500; }
   .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  /* Prize Picture picker */
+  .icon-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+  .icon-tile { background: rgba(0,0,0,0.3); border: 2px solid transparent; border-radius: 10px; padding: 6px 2px; cursor: pointer; text-align: center; font-size: 11px; color: #ccc; }
+  .icon-tile img { width: 40px; height: 40px; object-fit: contain; display: block; margin: 0 auto 4px; }
+  .icon-tile .auto { width: 40px; height: 40px; margin: 0 auto 4px; display: flex; align-items: center; justify-content: center; font-size: 26px; }
+  .icon-tile.sel { border-color: #F0A500; background: rgba(240,165,0,0.15); color: #F5C518; }
+  .photo-box { margin-top: 10px; background: rgba(0,0,0,0.25); border: 1px dashed rgba(240,165,0,0.4); border-radius: 10px; padding: 10px; display: flex; align-items: center; gap: 12px; }
+  .photo-box img { width: 70px; height: 70px; object-fit: contain; border-radius: 8px; background: #0E0B1A; }
+  .photo-hint { font-size: 11px; color: #9E9E9E; margin-top: 6px; line-height: 1.4; }
   .submit-btn { background: #C0392B; color: white; border: none; padding: 12px 24px; border-radius: 10px; font-size: 15px; font-weight: bold; cursor: pointer; width: 100%; margin-top: 8px; }
   .submit-btn:hover { background: #922B21; }
   .winner-confirm { text-align: center; padding: 10px; }
@@ -545,6 +554,20 @@ Question2|OptA|OptB|OptC|OptD|0"></textarea>
       <input class="form-input" id="newEmoji" placeholder="e.g. 📱" value="🎁">
     </div>
     <div class="form-group">
+      <label class="form-label">Prize Picture (app icon)</label>
+      <div class="icon-grid" id="newIconGrid"></div>
+      <div class="photo-box">
+        <img id="newPhotoPreview" style="display:none" alt="">
+        <div style="flex:1">
+          <div id="newPhotoStatus" style="font-size:13px;color:#ccc;">Real photo: nahi lagi (optional)</div>
+          <input type="file" accept="image/*" id="newPhotoFile" style="display:none" onchange="pickPrizePhoto('new')">
+          <button type="button" class="btn" style="background:#2E7D32;color:white;margin-top:6px;" onclick="document.getElementById('newPhotoFile').click()">📷 Real Photo Upload</button>
+          <button type="button" class="btn" id="newPhotoRemove" style="background:#555;color:white;margin-top:6px;display:none;" onclick="removePrizePhoto('new')">✕ Hatao</button>
+        </div>
+      </div>
+      <div class="photo-hint">Photo sirf bari jagah dikhegi (Home card, Draw page, popups). Chhoti jagah upar wala icon dikhega.<br>Behtareen: apni khud ki photo, transparent background PNG (remove.bg se), koi brand ki official photo nahi.</div>
+    </div>
+    <div class="form-group">
       <label class="form-label">Prize Name</label>
       <input class="form-input" id="newPrizeName" placeholder="e.g. iPhone 15">
     </div>
@@ -607,6 +630,20 @@ Question2|OptA|OptB|OptC|OptD|0"></textarea>
     <div class="form-group">
       <label class="form-label">Prize Emoji</label>
       <input class="form-input" id="editEmoji">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Prize Picture (app icon)</label>
+      <div class="icon-grid" id="editIconGrid"></div>
+      <div class="photo-box">
+        <img id="editPhotoPreview" style="display:none" alt="">
+        <div style="flex:1">
+          <div id="editPhotoStatus" style="font-size:13px;color:#ccc;">Real photo: nahi lagi (optional)</div>
+          <input type="file" accept="image/*" id="editPhotoFile" style="display:none" onchange="pickPrizePhoto('edit')">
+          <button type="button" class="btn" style="background:#2E7D32;color:white;margin-top:6px;" onclick="document.getElementById('editPhotoFile').click()">📷 Real Photo Upload</button>
+          <button type="button" class="btn" id="editPhotoRemove" style="background:#555;color:white;margin-top:6px;display:none;" onclick="removePrizePhoto('edit')">✕ Hatao</button>
+        </div>
+      </div>
+      <div class="photo-hint">Photo sirf bari jagah dikhegi (Home card, Draw page, popups). Chhoti jagah upar wala icon dikhega.<br>Behtareen: apni khud ki photo, transparent background PNG (remove.bg se), koi brand ki official photo nahi.</div>
     </div>
     <div class="form-group">
       <label class="form-label">Prize Name</label>
@@ -2255,9 +2292,106 @@ async function deletePoll(pollId) {
   } catch(e) { showToast('❌ Error: ' + e.message, true); }
 }
 
+// ── Prize Picture (app icon + optional real photo) ───────────────────────────
+// prizeIcon '' = Auto (app guesses from the prize name).
+// Icon images live in the admin repo folder prize_icons/ (same art as the app).
+const PRIZE_ICONS = [
+  ['', 'Auto'], ['phone', 'Phone'], ['earbuds', 'Earbuds'], ['headphones', 'Headphones'],
+  ['watch', 'Watch'], ['power_bank', 'Power Bank'], ['speaker', 'Speaker'],
+  ['keypad_phone', 'Keypad'], ['laptop', 'Laptop'], ['controller', 'Controller'],
+];
+const prizePic = {
+  new: { icon: '', photo: '', uploading: false },
+  edit: { icon: '', photo: '', uploading: false },
+};
+const CLOUDINARY_CLOUD = 'yjlagxl3';
+const CLOUDINARY_PRESET = 'winner_proofs'; // same unsigned preset the app uses
+
+function renderIconGrid(p) {
+  const grid = document.getElementById(p + 'IconGrid');
+  grid.innerHTML = PRIZE_ICONS.map(([key, label]) => `
+    <div class="icon-tile ${prizePic[p].icon === key ? 'sel' : ''}" onclick="selectPrizeIcon('${p}','${key}')">
+      ${key === '' ? '<div class="auto">✨</div>'
+        : `<img src="prize_icons/${key}.png" alt="" onerror="this.style.visibility='hidden'">`}
+      ${label}
+    </div>`).join('');
+}
+function selectPrizeIcon(p, key) {
+  prizePic[p].icon = key;
+  renderIconGrid(p);
+}
+function renderPhoto(p) {
+  const url = prizePic[p].photo;
+  const img = document.getElementById(p + 'PhotoPreview');
+  img.style.display = url ? 'block' : 'none';
+  if (url) img.src = url;
+  document.getElementById(p + 'PhotoRemove').style.display = url ? 'inline-block' : 'none';
+  document.getElementById(p + 'PhotoStatus').textContent = prizePic[p].uploading
+    ? '⏳ Upload ho rahi hai...'
+    : (url ? '✅ Real photo lag gayi' : 'Real photo: nahi lagi (optional)');
+}
+function setPrizePic(p, icon, photo) {
+  prizePic[p] = { icon: icon || '', photo: photo || '', uploading: false };
+  const f = document.getElementById(p + 'PhotoFile');
+  if (f) f.value = '';
+  renderIconGrid(p);
+  renderPhoto(p);
+}
+function removePrizePhoto(p) {
+  prizePic[p].photo = '';
+  renderPhoto(p);
+}
+// Shrinks the photo in the browser (max 800px) before uploading.
+// PNG stays PNG (keeps the transparent background), others become JPG.
+function shrinkImage(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, 800 / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * scale);
+      c.height = Math.round(img.height * scale);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      const isPng = file.type === 'image/png';
+      c.toBlob((b) => b ? resolve(b) : reject(new Error('resize failed')),
+        isPng ? 'image/png' : 'image/jpeg', 0.88);
+      URL.revokeObjectURL(img.src);
+    };
+    img.onerror = () => reject(new Error('Yeh file photo nahi hai'));
+    img.src = URL.createObjectURL(file);
+  });
+}
+async function pickPrizePhoto(p) {
+  const file = document.getElementById(p + 'PhotoFile').files[0];
+  if (!file) return;
+  if (!file.type.startsWith('image/')) { showToast('❌ Sirf photo select karein', true); return; }
+  prizePic[p].uploading = true;
+  renderPhoto(p);
+  try {
+    const blob = await shrinkImage(file);
+    const form = new FormData();
+    form.append('file', blob);
+    form.append('upload_preset', CLOUDINARY_PRESET);
+    form.append('folder', 'prize_images');
+    const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/image/upload`, { method: 'POST', body: form });
+    const body = await res.json();
+    if (!res.ok || !body.secure_url) throw new Error((body.error && body.error.message) || ('HTTP ' + res.status));
+    // q_auto = smaller file for phones, same format (keeps PNG transparency)
+    prizePic[p].photo = body.secure_url.replace('/upload/', '/upload/q_auto/');
+    showToast('✅ Photo upload ho gayi', false);
+  } catch (e) {
+    showToast('❌ Photo upload nahi hui: ' + e.message, true);
+  } finally {
+    prizePic[p].uploading = false;
+    renderPhoto(p);
+  }
+}
+
 // ── Add Draw ──────────────────────────────────────────────────────────────────
 function showAddDrawModal() {
   document.getElementById('addDrawModal').classList.add('show');
+  renderIconGrid('new');
+  renderPhoto('new');
   const dateInput = document.getElementById('newDrawDate');
   if (dateInput && !dateInput.value) {
     // Uses Firebase's clock (serverNow), so it's right even if the laptop time is wrong.
@@ -2288,8 +2422,10 @@ async function createDraw() {
   const drawType = document.getElementById('newDrawType').value;
   const isTargetBased = drawType === 'target';
   if (!prizeName) { showToast('❌ Prize name daalo!', true); return; }
+  if (prizePic.new.uploading) { showToast('⏳ Photo upload hone dein, phir dobara dabayein', true); return; }
   const data = {
     prizeName, prizeEmoji, prizeDescription: prizeDesc,
+    prizeIcon: prizePic.new.icon, prizeImageUrl: prizePic.new.photo,
     prizeValue, ticketCost, ticketCost2, ticketCost3, ticketCost4,
     isTargetBased, status: 'active', currentEntries: 0, isFeatured: false,
     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -2307,6 +2443,7 @@ async function createDraw() {
     await db.collection('draws').add(data);
     bumpDrawsSignal();
     closeModal('addDrawModal');
+    setPrizePic('new', '', '');
     showToast('✅ Naya draw ban gaya!', false);
     await db.collection('broadcast_notifications').add({
       title: '🎉 Naya Draw Available!',
@@ -2325,6 +2462,7 @@ function showEditDrawModal(drawId) {
   if (!draw) { showToast('❌ Draw nahi mila, page refresh karo', true); return; }
   editingDrawId = draw.id;
   document.getElementById('editEmoji').value = draw.prizeEmoji || '🎁';
+  setPrizePic('edit', draw.prizeIcon || '', draw.prizeImageUrl || '');
   document.getElementById('editPrizeName').value = draw.prizeName || '';
   document.getElementById('editPrizeDesc').value = draw.prizeDescription || '';
   document.getElementById('editPrizeValue').value = draw.prizeValue || 0;
@@ -2356,10 +2494,13 @@ function toggleEditDrawType() {
 
 async function saveEditDraw() {
   if (!editingDrawId) return;
+  if (prizePic.edit.uploading) { showToast('⏳ Photo upload hone dein, phir dobara dabayein', true); return; }
   const drawType = document.getElementById('editDrawType').value;
   const isTargetBased = drawType === 'target';
   const data = {
     prizeEmoji: document.getElementById('editEmoji').value.trim(),
+    prizeIcon: prizePic.edit.icon,
+    prizeImageUrl: prizePic.edit.photo,
     prizeName: document.getElementById('editPrizeName').value.trim(),
     prizeDescription: document.getElementById('editPrizeDesc').value.trim(),
     prizeValue: parseInt(document.getElementById('editPrizeValue').value) || 0,
