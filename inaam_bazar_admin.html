@@ -1705,6 +1705,7 @@ async function loadClaims() {
     const pendingCount = allClaimsCache.filter(c => c.status === 'pending_info' || c.status === 'reviewing').length;
     document.getElementById('claimsCount').textContent = pendingCount;
     renderClaims();
+    syncClaimCities(); // quietly copy winners' cities to the Winners Wall
   } catch(e) {
     document.getElementById('claimsList').innerHTML = '<div class="loading">Error: ' + e.message + '</div>';
   }
@@ -1778,6 +1779,33 @@ function renderClaims() {
   }).join('');
 }
 
+// Copies each winner's city from their claim to the draw, so the app's
+// Winners Wall shows "📍 City". Runs by itself whenever claims load.
+// Only the city is copied (never phone/address), once per claim, and only
+// if that claim's user is still the draw's winner (safe after a reroll).
+async function syncClaimCities() {
+  for (const c of allClaimsCache) {
+    const raw = String(c.city || '').trim();
+    if (!raw || c.cityCopied === raw) continue;
+    const drawId = c.drawId || String(c.id).split('_')[0];
+    if (!drawId) continue;
+    try {
+      let d = findDraw(drawId);
+      if (!d) {
+        const snap = await db.collection('draws').doc(drawId).get();
+        d = snap.exists ? snap.data() : null;
+      }
+      if (!d || d.winnerId !== c.userId) continue;
+      const city = (raw.charAt(0).toUpperCase() + raw.slice(1)).slice(0, 30);
+      await db.collection('draws').doc(drawId).update({ winnerCity: city });
+      await db.collection('prize_claims').doc(c.id).update({ cityCopied: raw });
+      c.cityCopied = raw;
+    } catch (e) {
+      console.warn('City sync failed for ' + c.id + ': ' + e.message);
+    }
+  }
+}
+
 async function updateClaimStatus(claimId, newStatus) {
   if (!newStatus) return;
   try {
@@ -1787,15 +1815,6 @@ async function updateClaimStatus(claimId, newStatus) {
     });
     const claimForLog = allClaimsCache.find(x => x.id === claimId) || {};
     logAudit('claim_status_changed', { claimId, winner: claimForLog.fullName || '', prize: claimForLog.prizeName || '', newStatus });
-    // Show the winner's city on the Winners Wall (only the city — never phone/address)
-    const claimDrawId = claimForLog.drawId || String(claimId).split('_')[0];
-    const rawCity = String(claimForLog.city || '').trim();
-    if (claimDrawId && rawCity) {
-      const niceCity = rawCity.charAt(0).toUpperCase() + rawCity.slice(1);
-      try {
-        await db.collection('draws').doc(claimDrawId).update({ winnerCity: niceCity.slice(0, 30) });
-      } catch (e) { console.warn('City copy failed:', e.message); }
-    }
     showToast('✅ Status update ho gaya!', false);
     loadClaims();
   } catch(e) {
