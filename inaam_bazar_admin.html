@@ -1760,10 +1760,11 @@ function renderClaims() {
         </div>
         <div style="background:rgba(0,0,0,0.2);border-radius:8px;padding:10px;margin-bottom:12px;">
           <div style="font-size:11px;color:#9E9E9E;margin-bottom:4px;">📍 Address</div>
-          <div style="font-size:13px;color:white;">${escHtml(c.city || '')} — ${escHtml(c.address || '')}</div>
+          <div style="font-size:13px;color:white;">${escHtml(c.city || '')}${c.province ? ', ' + escHtml(c.province) : ''} — ${escHtml(c.address || '')}</div>
         </div>
         <div class="draw-actions">
           <a href="${waLink}" target="_blank" class="btn" style="background:#25D366;color:white;text-decoration:none;">💬 WhatsApp</a>
+          ${c.userId ? `<button class="btn btn-entries" data-uid="${escHtml(c.userId)}" onclick="switchTab('users'); openUserInLookup(this.dataset.uid)">🔎 User Info</button>` : ''}
           <select class="form-input" style="width:auto;padding:8px;" data-id="${escHtml(c.id)}" onchange="updateClaimStatus(this.dataset.id, this.value)">
             <option value="">Status Badlein...</option>
             <option value="pending_info" ${c.status === 'pending_info' ? 'selected' : ''}>⏳ Pending Review</option>
@@ -1786,6 +1787,15 @@ async function updateClaimStatus(claimId, newStatus) {
     });
     const claimForLog = allClaimsCache.find(x => x.id === claimId) || {};
     logAudit('claim_status_changed', { claimId, winner: claimForLog.fullName || '', prize: claimForLog.prizeName || '', newStatus });
+    // Show the winner's city on the Winners Wall (only the city — never phone/address)
+    const claimDrawId = claimForLog.drawId || String(claimId).split('_')[0];
+    const rawCity = String(claimForLog.city || '').trim();
+    if (claimDrawId && rawCity) {
+      const niceCity = rawCity.charAt(0).toUpperCase() + rawCity.slice(1);
+      try {
+        await db.collection('draws').doc(claimDrawId).update({ winnerCity: niceCity.slice(0, 30) });
+      } catch (e) { console.warn('City copy failed:', e.message); }
+    }
     showToast('✅ Status update ho gaya!', false);
     loadClaims();
   } catch(e) {
@@ -1953,6 +1963,7 @@ function buildDrawCard(draw, showCollapse) {
       <div class="winner-box-title" style="${isPending ? 'color:#9B59B6;' : ''}">${isPending ? '⏳ WINNER SELECTED — Live Draw Pending' : '🏆 WINNER'}</div>
       <div class="winner-name">${escHtml(draw.winnerName)}</div>
       <div class="winner-detail">${escHtml(draw.winnerEmail || '')}</div>
+      ${draw.winnerId ? `<button class="btn btn-entries" style="margin-top:8px;" data-uid="${escHtml(draw.winnerId)}" onclick="switchTab('users'); openUserInLookup(this.dataset.uid)">🔎 Winner Ki Poori Info</button>` : ''}
     </div>` : '';
 
   return `
