@@ -235,6 +235,19 @@
 
     <!-- ═══════════════════════ TAB: CLAIMS ═══════════════════════════ -->
     <div class="tab-panel" id="tab-claims">
+      <!-- 🚩 User reports on Winners Wall proofs (Google Play UGC policy) -->
+      <div style="background:#16213E;border:1px solid rgba(231,76,60,0.45);border-radius:12px;padding:16px;margin-bottom:24px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="toggleReportsPanel(event)">
+          <span style="font-size:15px;font-weight:bold;color:#E74C3C;">🚩 Reports (Winner Proofs)</span>
+          <span style="display:flex;align-items:center;gap:8px;">
+            <span id="reportsCount" style="background:#E74C3C;padding:2px 10px;border-radius:12px;font-size:12px;color:white;">0</span>
+            <span id="reportsPanelToggleIcon" style="font-size:12px;color:#9E9E9E;">▶</span>
+          </span>
+        </div>
+        <div id="reportsPanelBody" style="display:none;margin-top:10px;">
+          <div id="reportsList"><div class="loading">Loading reports...</div></div>
+        </div>
+      </div>
       <div style="background:#16213E;border:1px solid rgba(240,165,0,0.4);border-radius:12px;padding:16px;margin-bottom:24px;">
         <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="toggleProofsPanel(event)">
           <span style="font-size:15px;font-weight:bold;color:#F0A500;">📸 Winner Proof Submissions</span>
@@ -1669,6 +1682,112 @@ async function rejectProof(proofId) {
   } catch(e) { showToast('❌ Error: ' + e.message, true); }
 }
 
+// ── User Reports on Winners Wall proofs (Google Play UGC policy) ──────────────
+let allReportsCache = [];
+let reportsPanelOpen = false;
+const REPORT_REASONS = { fake: 'Fake / ghalat proof', inappropriate: 'Nazeba content', other: 'Koi aur wajah' };
+
+function toggleReportsPanel(e) {
+  if (e) e.stopPropagation();
+  reportsPanelOpen = !reportsPanelOpen;
+  document.getElementById('reportsPanelBody').style.display = reportsPanelOpen ? 'block' : 'none';
+  document.getElementById('reportsPanelToggleIcon').textContent = reportsPanelOpen ? '▼' : '▶';
+}
+
+async function loadReports() {
+  try {
+    const snap = await db.collection('reports').where('status', '==', 'open').get();
+    allReportsCache = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => ((b.createdAt && b.createdAt.seconds) || 0) - ((a.createdAt && a.createdAt.seconds) || 0));
+    document.getElementById('reportsCount').textContent = new Set(allReportsCache.map(r => r.proofId)).size;
+    renderReports();
+  } catch(e) {
+    document.getElementById('reportsList').innerHTML = '<div class="loading">Error: ' + escHtml(e.message) + '</div>';
+  }
+}
+
+function renderReports() {
+  const box = document.getElementById('reportsList');
+  if (!allReportsCache.length) {
+    box.innerHTML = '<div class="loading">✅ Koi open report nahi.</div>';
+    return;
+  }
+  const groups = {};
+  allReportsCache.forEach(r => { (groups[r.proofId] = groups[r.proofId] || []).push(r); });
+  box.innerHTML = Object.keys(groups).map(pid => {
+    const list = groups[pid];
+    const first = list[0];
+    const reasons = {};
+    list.forEach(r => { const k = REPORT_REASONS[r.reason] || r.reason; reasons[k] = (reasons[k] || 0) + 1; });
+    const reasonHtml = Object.keys(reasons).map(k => escHtml(k) + ' × ' + reasons[k]).join(' · ');
+    const lastStr = first.createdAt ? new Date(first.createdAt.seconds * 1000).toLocaleString('en-PK') : '-';
+    return `
+      <div class="draw-card" style="border-color:rgba(231,76,60,0.5);">
+        <div class="draw-card-header">
+          <div class="draw-info">
+            <div class="draw-name">🚩 ${escHtml(first.prizeName || 'Prize')} — ${list.length} report${list.length > 1 ? 's' : ''}</div>
+            <div class="draw-desc">${reasonHtml}</div>
+            <div class="draw-desc">Aakhri report: ${lastStr}</div>
+          </div>
+        </div>
+        <div class="draw-actions">
+          <button class="btn btn-entries" data-id="${escHtml(pid)}" onclick="viewReportedProof(this.dataset.id)">🖼️ Proof Dekho</button>
+          <button class="btn btn-delete" data-id="${escHtml(pid)}" onclick="removeReportedProof(this.dataset.id)">🚫 Proof Hatao</button>
+          <button class="btn" style="background:rgba(39,174,96,0.2);color:#27AE60;border:1px solid rgba(39,174,96,0.5);" data-id="${escHtml(pid)}" onclick="dismissReports(this.dataset.id)">✅ Theek Hai (Dismiss)</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function viewReportedProof(proofId) {
+  let proof = allProofsCache.find(p => p.id === proofId);
+  if (!proof) {
+    try {
+      const d = await db.collection('winner_proofs').doc(proofId).get();
+      proof = d.exists ? d.data() : null;
+    } catch(e) { proof = null; }
+  }
+  const url = proof ? safeUrl(proof.fileUrl) : '';
+  if (!url) { showToast('❌ Proof file nahi mili (shayad pehle hi hata di gayi)', true); return; }
+  window.open(url, '_blank', 'noopener');
+}
+
+async function closeReportsFor(proofId, status) {
+  const batch = db.batch();
+  allReportsCache.filter(r => r.proofId === proofId).forEach(r => {
+    batch.update(db.collection('reports').doc(r.id), {
+      status, closedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+  });
+  await batch.commit();
+}
+
+async function removeReportedProof(proofId) {
+  if (!confirm('Yeh proof Winners Wall se hata dein? (Status "rejected" ho jayega)')) return;
+  try {
+    await db.collection('winner_proofs').doc(proofId).update({
+      status: 'rejected',
+      rejectedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      rejectedReason: 'reported',
+    });
+    await closeReportsFor(proofId, 'resolved');
+    logAudit('proof_removed_after_report', { proofId });
+    showToast('🚫 Proof hata diya gaya', false);
+    loadProofs();
+    loadReports();
+  } catch(e) { showToast('❌ Error: ' + e.message, true); }
+}
+
+async function dismissReports(proofId) {
+  if (!confirm('Proof theek hai — reports band kar dein?')) return;
+  try {
+    await closeReportsFor(proofId, 'dismissed');
+    logAudit('report_dismissed', { proofId });
+    showToast('✅ Reports dismiss ho gaye', false);
+    loadReports();
+  } catch(e) { showToast('❌ Error: ' + e.message, true); }
+}
+
 // ── Prize Claims ──────────────────────────────────────────────────────────────
 let allClaimsCache = [];
 let claimFilter = 'pending_info';
@@ -1874,6 +1993,7 @@ async function loadDashboard() {
     checkQuizStatus();
     loadClaims();
     loadProofs();
+    loadReports();
     checkExpiredWins();
     checkLeaderboardStatus();
     loadAppControls();
