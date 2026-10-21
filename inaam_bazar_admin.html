@@ -874,6 +874,9 @@ function switchTab(tabName) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('tab-' + tabName).classList.add('active');
   document.getElementById('tabBtn-' + tabName).classList.add('active');
+  // These lists load only when their tab is opened (saves Firestore reads)
+  if (tabName === 'notifications') loadNotifHistory();
+  if (tabName === 'audit') loadAuditLog();
 }
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
@@ -1418,10 +1421,11 @@ async function deleteQuizQuestion(id) {
 
 async function checkQuizStatus() {
   try {
-    const allSnap = await db.collection('quiz_questions').get();
-    const total = allSnap.size;
-    const usedCount = allSnap.docs.filter(d => d.data().used === true).length;
-    const remaining = total - usedCount;
+    const [total, usedCount] = await Promise.all([
+      restCount('quiz_questions'),
+      restCount('quiz_questions', [['used', '==', true]]),
+    ]);
+    const remaining = (typeof total === 'number' && typeof usedCount === 'number') ? total - usedCount : '–';
     document.getElementById('quizStatus').textContent =
       `${remaining} available • ${usedCount} used • ${total} total`;
   } catch(e) {
@@ -1430,15 +1434,16 @@ async function checkQuizStatus() {
 }
 
 // ── Expired Unclaimed Wins ───────────────────────────────────────────────────
-async function checkExpiredWins() {
+async function checkExpiredWins(preloadedDocs) {
   try {
-    const snap = await db.collection('draws')
+    const docs = preloadedDocs || (await db.collection('draws')
       .where('winnerId', '!=', null)
-      .get();
+      .get()).docs;
 
     const now = new Date();
-    const expired = snap.docs.filter(doc => {
+    const expired = docs.filter(doc => {
       const d = doc.data();
+      if (!d.winnerId) return false;
       if (d.claimSubmitted === true) return false;
       if (d.pendingCompletion === true) return false; // Live Draw hasn't run yet — not actually completed
       if (!d.winnerClaimDeadline) return false;
@@ -1536,6 +1541,7 @@ function toggleProofsPanel(e) {
   proofsPanelOpen = !proofsPanelOpen;
   document.getElementById('proofsPanelBody').style.display = proofsPanelOpen ? 'block' : 'none';
   document.getElementById('proofsPanelToggleIcon').textContent = proofsPanelOpen ? '▼' : '▶';
+  if (proofsPanelOpen) loadProofs();
 }
 
 function setProofFilter(filter) {
@@ -1692,6 +1698,7 @@ function toggleReportsPanel(e) {
   reportsPanelOpen = !reportsPanelOpen;
   document.getElementById('reportsPanelBody').style.display = reportsPanelOpen ? 'block' : 'none';
   document.getElementById('reportsPanelToggleIcon').textContent = reportsPanelOpen ? '▼' : '▶';
+  if (reportsPanelOpen) loadReports();
 }
 
 async function loadReports() {
@@ -1699,7 +1706,7 @@ async function loadReports() {
     const snap = await db.collection('reports').where('status', '==', 'open').get();
     allReportsCache = snap.docs.map(d => ({ id: d.id, ...d.data() }))
       .sort((a, b) => ((b.createdAt && b.createdAt.seconds) || 0) - ((a.createdAt && a.createdAt.seconds) || 0));
-    document.getElementById('reportsCount').textContent = new Set(allReportsCache.map(r => r.proofId)).size;
+    document.getElementById('reportsCount').textContent = allReportsCache.length;
     renderReports();
   } catch(e) {
     document.getElementById('reportsList').innerHTML = '<div class="loading">Error: ' + escHtml(e.message) + '</div>';
@@ -1798,6 +1805,7 @@ function toggleClaimsPanel(e) {
   claimsPanelOpen = !claimsPanelOpen;
   document.getElementById('claimsPanelBody').style.display = claimsPanelOpen ? 'block' : 'none';
   document.getElementById('claimsPanelToggleIcon').textContent = claimsPanelOpen ? '▼' : '▶';
+  if (claimsPanelOpen) loadClaims(); // also copies winners' cities to the Winners Wall
 }
 
 function setClaimFilter(filter) {
@@ -1955,31 +1963,86 @@ async function countDocs(query) {
   return snap.size;
 }
 
+// ── Cheap counting (saves Firestore reads) ───────────────────────────────────
+// Asks Firestore for just the NUMBER of matching documents (costs about
+// 1 read per 1,000 documents) through the official REST "count" call.
+// Works with this page's Firebase version. Returns '–' if it fails, and never
+// falls back to downloading the whole collection.
+const FS_PROJECT_ID = 'inaam-bazar';
+async function restCount(collectionId, filters) {
+  try {
+    const token = await auth.currentUser.getIdToken();
+    const toValue = (v) => typeof v === 'boolean' ? { booleanValue: v }
+      : typeof v === 'number' ? (Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v })
+      : v instanceof Date ? { timestampValue: v.toISOString() }
+      : Array.isArray(v) ? { arrayValue: { values: v.map(toValue) } }
+      : { stringValue: String(v) };
+    const OPS = { '==': 'EQUAL', '!=': 'NOT_EQUAL', '>': 'GREATER_THAN', '>=': 'GREATER_THAN_OR_EQUAL',
+                  '<': 'LESS_THAN', '<=': 'LESS_THAN_OR_EQUAL', 'in': 'IN' };
+    const parts = (filters || []).map(([field, op, value]) => ({
+      fieldFilter: { field: { fieldPath: field }, op: OPS[op], value: toValue(value) },
+    }));
+    const structuredQuery = { from: [{ collectionId }] };
+    if (parts.length === 1) structuredQuery.where = parts[0];
+    if (parts.length > 1) structuredQuery.where = { compositeFilter: { op: 'AND', filters: parts } };
+    const res = await fetch('https://firestore.googleapis.com/v1/projects/' + FS_PROJECT_ID +
+        '/databases/(default)/documents:runAggregationQuery', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ structuredAggregationQuery: {
+        aggregations: [{ alias: 'n', count: {} }], structuredQuery } }),
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const f = data && data[0] && data[0].result && data[0].result.aggregateFields;
+    return f && f.n ? Number(f.n.integerValue || 0) : 0;
+  } catch (e) {
+    console.error('restCount ' + collectionId, e);
+    return '–';
+  }
+}
+
 async function loadExtraStats() {
   try {
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
     const weekAgo = new Date(Date.now() - 7 * 86400000);
-    const ts = (d) => firebase.firestore.Timestamp.fromDate(d);
-    const [today, week, claims, proofs] = await Promise.all([
-      countDocs(db.collection('users').where('createdAt', '>=', ts(startOfToday))),
-      countDocs(db.collection('users').where('createdAt', '>=', ts(weekAgo))),
-      countDocs(db.collection('prize_claims').where('status', 'in', ['pending_info', 'reviewing'])),
-      countDocs(db.collection('winner_proofs').where('status', '==', 'pending')),
+    const [today, week, claims, proofs, reports, referrals] = await Promise.all([
+      restCount('users', [['createdAt', '>=', startOfToday]]),
+      restCount('users', [['createdAt', '>=', weekAgo]]),
+      restCount('prize_claims', [['status', 'in', ['pending_info', 'reviewing']]]),
+      restCount('winner_proofs', [['status', '==', 'pending']]),
+      restCount('reports', [['status', '==', 'open']]),
+      restCount('pending_referrals', [['status', '==', 'pending']]),
     ]);
     document.getElementById('newUsersToday').textContent = today;
     document.getElementById('newUsersWeek').textContent = week;
     document.getElementById('pendingClaimsStat').textContent = claims;
     document.getElementById('pendingProofsStat').textContent = proofs;
+    // Panel badges (the full lists load only when you open a panel)
+    if (!claimsPanelOpen) document.getElementById('claimsCount').textContent = claims;
+    if (!proofsPanelOpen) document.getElementById('proofsCount').textContent = proofs;
+    if (!reportsPanelOpen) document.getElementById('reportsCount').textContent = reports;
+    if (!pendingSectionOpen) document.getElementById('pendingCount').textContent = referrals;
   } catch(e) {
     console.error('Extra stats error:', e);
   }
 }
 
+// Reload only the heavy lists that are open on screen right now
+function reloadOpenPanels() {
+  if (claimsPanelOpen) loadClaims();
+  if (proofsPanelOpen) loadProofs();
+  if (reportsPanelOpen) loadReports();
+  if (pendingSectionOpen) loadPendingReferrals();
+  if (document.getElementById('tab-notifications').classList.contains('active')) loadNotifHistory();
+  if (document.getElementById('tab-audit').classList.contains('active')) loadAuditLog();
+}
+
 async function loadDashboard() {
   try {
     const drawsSnap = await db.collection('draws').get();
-    const totalUsersCount = await countDocs(db.collection('users'));
+    const totalUsersCount = await restCount('users');
     const draws = drawsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     const active = draws.filter(d => d.status === 'active').length;
     document.getElementById('totalDraws').textContent = draws.length;
@@ -1987,19 +2050,16 @@ async function loadDashboard() {
     document.getElementById('totalUsers').textContent = totalUsersCount;
     loadExtraStats();
     renderDraws(draws);
-    loadPendingReferrals();
     checkHappyHourStatus();
     checkAnnouncementStatus();
     checkQuizStatus();
-    loadClaims();
-    loadProofs();
-    loadReports();
-    checkExpiredWins();
+    checkExpiredWins(drawsSnap.docs); // re-uses the draws already loaded above
     checkLeaderboardStatus();
     loadAppControls();
-    loadNotifHistory();
-    loadAuditLog();
-    loadPolls(); // loads count only unless expanded
+    loadPolls(); // only the 5 newest polls
+    // Claims, proofs, reports, referrals, notifications and the audit log
+    // load only when you open their panel/tab (saves Firestore reads).
+    reloadOpenPanels();
   } catch(e) {
     document.getElementById('drawsList').innerHTML = '<div class="loading">Error loading. Check Firestore rules.</div>';
   }
