@@ -220,7 +220,7 @@
       <div style="background:#16213E;border:1px solid rgba(52,152,219,0.4);border-radius:12px;padding:16px;margin-bottom:24px;">
         <div style="font-size:15px;font-weight:bold;color:#3498DB;margin-bottom:10px;">🔍 User Lookup</div>
         <div style="display:flex;gap:8px;margin-bottom:6px;">
-          <input class="form-input" id="userSearchInput" placeholder="Email, naam, referral code ya UID..." onkeydown="if(event.key==='Enter') searchUsers()">
+          <input class="form-input" id="userSearchInput" placeholder="Email, naam, referral code, UID ya Phone code (7F3A-91C2)..." onkeydown="if(event.key==='Enter') searchUsers()">
           <button class="btn" style="background:#3498DB;color:white;" onclick="searchUsers()">Search</button>
         </div>
         <div style="font-size:11px;color:#9E9E9E;margin-bottom:12px;">Email poora likhna hoga. Naam ka shuruaati hissa likho, bilkul waise hi (capital/small letters) jaise profile mein hai.</div>
@@ -536,6 +536,18 @@ Question2|OptA|OptB|OptC|OptD|0"></textarea>
         <div style="font-size:12px;color:#9E9E9E;margin-bottom:10px;">On karne par poori app users ke liye band ho jayegi aur yeh message dikhega.</div>
         <input class="form-input" id="maintenanceMessage" placeholder="App maintenance ho rahi hai. Thodi der baad try karein." style="margin-bottom:10px;">
         <button class="btn" id="maintenanceToggleBtn" onclick="toggleMaintenance()">-</button>
+      </div>
+
+      <div style="background:#16213E;border:1px solid rgba(52,152,219,0.5);border-radius:12px;padding:16px;margin-bottom:24px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+          <span style="font-size:15px;font-weight:bold;color:#3498DB;">⬆️ Zaroori Update (Minimum Build)</span>
+          <span id="minBuildStatus" style="font-size:12px;color:#9E9E9E;">Loading...</span>
+        </div>
+        <div style="font-size:12px;color:#9E9E9E;margin-bottom:10px;">Is build number se PURANI app walon ko "Naya Update Aaya Hai" screen dikhegi (Play Store button ke saath). Build number = pubspec.yaml mein "+" ke baad wala number (1.0.0+3 → 3). 0 = band. ⚠️ Pehle confirm karein ke yeh build Play Store par LIVE hai! (Build 1 aur 2 mein yeh screen nahi hai — sirf build 3 se kaam karti hai.)</div>
+        <div style="display:flex;gap:8px;">
+          <input class="form-input" id="minBuildInput" type="number" min="0" step="1" placeholder="e.g. 3">
+          <button class="btn" style="background:#3498DB;color:white;white-space:nowrap;" onclick="saveMinBuild()">💾 Save</button>
+        </div>
       </div>
 
       <div style="background:#16213E;border:1px solid rgba(240,165,0,0.4);border-radius:12px;padding:16px;margin-bottom:24px;">
@@ -1869,6 +1881,26 @@ function renderClaims() {
     'shipped': '#E67E22',
     'completed': '#27AE60',
   };
+  // Same phone number / address used by a DIFFERENT account = maybe one
+  // person with 2 accounts. Only a warning — the same account winning
+  // again never shows it.
+  const phoneKey = (p) => String(p || '').replace(/[^0-9]/g, '').slice(-10);
+  const addrKey = (c) => (String(c.city || '') + String(c.address || '')).toLowerCase().replace(/[^a-z0-9]/g, '');
+  const usersByPhone = {}, usersByAddr = {};
+  allClaimsCache.forEach(c => {
+    const p = phoneKey(c.phone), a = addrKey(c);
+    if (p.length >= 10) (usersByPhone[p] = usersByPhone[p] || new Set()).add(c.userId);
+    if (a.length >= 12) (usersByAddr[a] = usersByAddr[a] || new Set()).add(c.userId);
+  });
+  const dupWarning = (c) => {
+    const p = phoneKey(c.phone), a = addrKey(c);
+    const samePhone = p.length >= 10 && usersByPhone[p] && usersByPhone[p].size > 1;
+    const sameAddr = a.length >= 12 && usersByAddr[a] && usersByAddr[a].size > 1;
+    if (!samePhone && !sameAddr) return '';
+    const what = samePhone && sameAddr ? 'phone number aur address' : (samePhone ? 'phone number' : 'address');
+    return `<div style="background:rgba(231,76,60,0.15);border:1px solid rgba(231,76,60,0.5);color:#E74C3C;border-radius:8px;padding:8px 10px;margin-bottom:12px;font-size:12px;font-weight:bold;">⚠️ Yeh ${what} pehle kisi DOOSRE account ke claim mein aa chuka hai. Prize bhejne se pehle check karein (ek insaan, do accounts?).</div>`;
+  };
+
   const statusLabels = {
     'pending_info': '⏳ Pending Review',
     'reviewing': '🔍 Reviewing',
@@ -1900,6 +1932,7 @@ function renderClaims() {
             <div style="font-size:14px;color:white;font-weight:bold;">${escHtml(c.phone || '-')}</div>
           </div>
         </div>
+        ${dupWarning(c)}
         <div style="background:rgba(0,0,0,0.2);border-radius:8px;padding:10px;margin-bottom:12px;">
           <div style="font-size:11px;color:#9E9E9E;margin-bottom:4px;">📍 Address</div>
           <div style="font-size:13px;color:white;">${escHtml(c.city || '')}${c.province ? ', ' + escHtml(c.province) : ''} — ${escHtml(c.address || '')}</div>
@@ -3412,6 +3445,8 @@ const AUDIT_LABELS = {
   game_toggled: '🎮 Game Switch',
   draw_deleted: '🗑️ Draw Delete',
   leaderboard_reset: '🏆 Leaderboard Reset',
+  phone_unlocked: '🔓 Phone Unlock',
+  min_build_changed: '⬆️ Minimum Build',
 };
 let auditCache = [];
 
@@ -3671,6 +3706,8 @@ async function searchUsers() {
   const term = document.getElementById('userSearchInput').value.trim();
   const box = document.getElementById('userSearchResults');
   if (!term) { showToast('❌ Pehle kuch likho!', true); return; }
+  // Phone code from a user's help email, e.g. "7F3A-91C2"
+  if (/^[0-9a-f]{4}-?[0-9a-f]{4}$/i.test(term)) { searchPhoneCode(term); return; }
   box.innerHTML = '<div class="loading" style="padding:16px;">Searching...</div>';
 
   const found = {};
@@ -3729,12 +3766,88 @@ function renderUserResults() {
         <div class="draw-actions">
           <button class="btn btn-entries" onclick="adjustUserTickets('${escHtml(u.id)}')">🎟️ Tickets Adjust</button>
           <button class="btn" style="background:rgba(52,152,219,0.2);color:#3498DB;border:1px solid rgba(52,152,219,0.4);" onclick="viewUserHistory('${escHtml(u.id)}')">📜 History</button>
+          <button class="btn" style="background:rgba(26,188,156,0.15);color:#1ABC9C;border:1px solid rgba(26,188,156,0.4);" onclick="showPhoneLocks('${escHtml(u.id)}')">📱 Phone Lock</button>
           ${banned
             ? `<button class="btn" style="background:#27AE60;color:white;" onclick="setUserBan('${escHtml(u.id)}', false)">✅ Unban</button>`
             : `<button class="btn btn-delete" onclick="setUserBan('${escHtml(u.id)}', true)">🚫 Ban Karo</button>`}
         </div>
       </div>`;
   }).join('');
+}
+
+// ── Phone lock (one phone = one account) ─────────────────────────────────────
+// device_accounts/{64-char phone key} = { uid, firstUid, email, lockedAt }
+// Unlock = delete the lock (+ its hint). The next Gmail that logs in on
+// that phone becomes its owner. Use it for sold/lost phones or lost Gmails.
+function phoneCodeOf(key) {
+  return (String(key).slice(0, 4) + '-' + String(key).slice(4, 8)).toUpperCase();
+}
+function phoneLockRow(d, userName) {
+  const l = d.data();
+  const when = l.lockedAt && l.lockedAt.seconds ? new Date(l.lockedAt.seconds * 1000).toLocaleString('en-PK') : '-';
+  return `<div class="entry-item" style="align-items:flex-start;">
+      <div style="min-width:0;">
+        <div class="entry-user">📱 ${escHtml(phoneCodeOf(d.id))}${userName ? ' — ' + escHtml(userName) : ''}</div>
+        <div class="entry-detail">✉️ ${escHtml(maskEmail(l.email || ''))} • Lock: ${when}</div>
+        <div class="entry-detail" style="font-size:10px;word-break:break-all;">UID: ${escHtml(l.uid || '-')}${l.firstUid && l.firstUid !== l.uid ? ' (pehla account delete ho chuka)' : ''}</div>
+      </div>
+      <button class="btn btn-delete" style="padding:6px 10px;font-size:12px;white-space:nowrap;" data-key="${escHtml(d.id)}" onclick="unlockPhone(this.dataset.key)">🔓 Unlock</button>
+    </div>`;
+}
+async function showPhoneLocks(uid) {
+  const u = userSearchCache[uid];
+  document.getElementById('entriesModalTitle').textContent = '📱 ' + ((u && u.name) || 'User') + ' — Phone Locks';
+  document.getElementById('entriesList').innerHTML = '<div class="loading">Loading...</div>';
+  document.getElementById('entriesModal').classList.add('show');
+  try {
+    const snap = await db.collection('device_accounts').where('uid', '==', uid).get();
+    document.getElementById('entriesList').innerHTML = snap.empty
+      ? '<div class="loading">Is account se koi phone lock nahi (purani app, ya abhi tak naya update nahi khola).</div>'
+      : '<div style="font-size:12px;color:#9E9E9E;margin-bottom:8px;">Yeh phones sirf is account ke liye hain. Unlock karne se agla Gmail us phone ka malik ban jayega.</div>'
+        + snap.docs.map(d => phoneLockRow(d, '')).join('');
+  } catch(e) {
+    document.getElementById('entriesList').innerHTML = '<div class="loading">Error: ' + escHtml(e.message) + '</div>';
+  }
+}
+async function searchPhoneCode(term) {
+  const box = document.getElementById('userSearchResults');
+  const prefix = term.replace('-', '').toLowerCase();
+  box.innerHTML = '<div class="loading" style="padding:16px;">Phone code dhoondh rahe hain...</div>';
+  try {
+    const idField = firebase.firestore.FieldPath.documentId();
+    const snap = await db.collection('device_accounts')
+      .where(idField, '>=', prefix).where(idField, '<', prefix + 'g').limit(5).get();
+    if (snap.empty) { box.innerHTML = '<div class="loading" style="padding:16px;">Is phone code ka koi lock nahi mila.</div>'; return; }
+    const rows = [];
+    for (const d of snap.docs) {
+      let name = '';
+      try {
+        const u = await db.collection('users').doc(d.data().uid).get();
+        name = u.exists ? (u.data().name || 'User') : '(account delete ho chuka)';
+      } catch (e) {}
+      rows.push(phoneLockRow(d, name) + (d.data().uid
+        ? `<div style="margin:-4px 0 10px;"><button class="btn btn-entries" style="padding:6px 10px;font-size:12px;" data-uid="${escHtml(d.data().uid)}" onclick="openUserInLookup(this.dataset.uid)">🔎 User Info</button></div>` : ''));
+    }
+    box.innerHTML = '<div class="draw-card"><div class="draw-name" style="margin-bottom:8px;">📱 Phone Lock</div>' + rows.join('') + '</div>';
+  } catch(e) {
+    box.innerHTML = '<div class="loading" style="padding:16px;">Error: ' + escHtml(e.message) + '</div>';
+  }
+}
+async function unlockPhone(key) {
+  if (!confirm(`Phone ${phoneCodeOf(key)} UNLOCK karna hai?\n\nIs phone par agla Gmail jo login karega woh iska naya malik ban jayega (naye account ko 10 welcome tickets milenge).\nSirf tab karein jab user ne email karke sahi wajah batayi ho.`)) return;
+  try {
+    const lock = await db.collection('device_accounts').doc(key).get();
+    const l = lock.exists ? lock.data() : {};
+    const batch = db.batch();
+    batch.delete(db.collection('device_accounts').doc(key));
+    batch.delete(db.collection('device_hints').doc(key));
+    await batch.commit();
+    logAudit('phone_unlocked', { phoneCode: phoneCodeOf(key), uid: l.uid || '', email: l.email || '' });
+    showToast('🔓 Phone unlock ho gaya', false);
+    closeModal('entriesModal');
+    const term = document.getElementById('userSearchInput').value.trim();
+    if (term) searchUsers();
+  } catch(e) { showToast('❌ Error: ' + e.message, true); }
 }
 
 async function setUserBan(uid, ban) {
@@ -3817,7 +3930,7 @@ const GAME_CONTROLS = [
   { key: 'plinko', label: 'Ticket Drop', emoji: '🎯' },
   { key: 'quiz', label: 'Daily Quiz', emoji: '🧠' },
 ];
-let appControlsCache = { maintenanceMode: false, maintenanceMessage: '', games: {} };
+let appControlsCache = { maintenanceMode: false, maintenanceMessage: '', games: {}, minBuild: 0 };
 
 async function loadAppControls() {
   try {
@@ -3827,6 +3940,7 @@ async function loadAppControls() {
       maintenanceMode: data.maintenanceMode === true,
       maintenanceMessage: data.maintenanceMessage || '',
       games: data.games || {},
+      minBuild: Number(data.minBuild) || 0,
     };
     renderAppControls();
   } catch(e) {
@@ -3835,6 +3949,11 @@ async function loadAppControls() {
 }
 
 function renderAppControls() {
+  const mb = appControlsCache.minBuild;
+  const mbEl = document.getElementById('minBuildStatus');
+  mbEl.textContent = mb > 0 ? '🔵 ON — build ' + mb + ' se purani band' : '⚫ OFF';
+  mbEl.style.color = mb > 0 ? '#3498DB' : '#9E9E9E';
+  document.getElementById('minBuildInput').value = mb > 0 ? mb : '';
   const on = appControlsCache.maintenanceMode;
   const statusEl = document.getElementById('maintenanceStatus');
   statusEl.textContent = on ? '🔴 ON — app disabled' : '🟢 OFF — app active';
@@ -3874,6 +3993,26 @@ async function toggleMaintenance() {
     }, { merge: true });
     logAudit('maintenance_toggled', { enabled: turningOn, message });
     showToast(turningOn ? '🚧 Maintenance ON' : '✅ Maintenance OFF', false);
+    loadAppControls();
+  } catch(e) { showToast('❌ Error: ' + e.message, true); }
+}
+
+async function saveMinBuild() {
+  const raw = document.getElementById('minBuildInput').value.trim();
+  const value = raw === '' ? 0 : parseInt(raw, 10);
+  if (isNaN(value) || value < 0 || value > 100000) { showToast('❌ Sahi build number likho (e.g. 3), ya 0 = band', true); return; }
+  if (value === appControlsCache.minBuild) { showToast('Koi tabdeeli nahi', false); return; }
+  const question = value > 0
+    ? `Build ${value} se PURANI app walon ko "Update Karein" screen dikhegi aur app nahi chalegi.\n\nKya build ${value} (ya naya) Play Store par LIVE hai? Agar nahi, to users phans jayenge!`
+    : 'Zaroori update band karna hai? (Sab builds chalengi)';
+  if (!confirm(question)) return;
+  try {
+    await db.collection('config').doc('app_controls').set({
+      minBuild: value,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+    logAudit('min_build_changed', { minBuild: value });
+    showToast(value > 0 ? '⬆️ Minimum build: ' + value : '✅ Zaroori update band', false);
     loadAppControls();
   } catch(e) { showToast('❌ Error: ' + e.message, true); }
 }
