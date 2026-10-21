@@ -77,6 +77,11 @@
   .icon-tile img { width: 40px; height: 40px; object-fit: contain; display: block; margin: 0 auto 4px; }
   .icon-tile .auto { width: 40px; height: 40px; margin: 0 auto 4px; display: flex; align-items: center; justify-content: center; font-size: 26px; }
   .icon-tile.sel { border-color: #F0A500; background: rgba(240,165,0,0.15); color: #F5C518; }
+  /* Poll option icon picker (smaller tiles) */
+  .icon-grid.mini { grid-template-columns: repeat(6, 1fr); gap: 5px; margin-top: 8px; }
+  .icon-grid.mini .icon-tile { padding: 4px 1px; font-size: 9px; }
+  .icon-grid.mini .icon-tile img, .icon-grid.mini .icon-tile .auto { width: 26px; height: 26px; font-size: 17px; margin-bottom: 2px; }
+  .poll-icon-note { font-size: 11px; color: #9E9E9E; margin-top: 4px; }
   .photo-box { margin-top: 10px; background: rgba(0,0,0,0.25); border: 1px dashed rgba(240,165,0,0.4); border-radius: 10px; padding: 10px; display: flex; align-items: center; gap: 12px; }
   .photo-box img { width: 70px; height: 70px; object-fit: contain; border-radius: 8px; background: #0E0B1A; }
   .photo-hint { font-size: 11px; color: #9E9E9E; margin-top: 6px; line-height: 1.4; }
@@ -745,33 +750,42 @@ Question2|OptA|OptB|OptC|OptD|0"></textarea>
         <option value="forever">Forever (Manual close)</option>
       </select>
     </div>
-    <div class="form-group">
+    <div class="form-label" style="margin-bottom:10px;">Har option ka icon chuno — ✨ Auto = app naam se khud icon chunegi. Emoji sirf tab dikhega jab koi icon match na ho.</div>
+    <div class="form-group poll-opt">
       <label class="form-label">Option 1</label>
       <div class="form-row">
-        <input class="form-input" id="pollOpt1Emoji" placeholder="Emoji (e.g. 🎧)">
-        <input class="form-input" id="pollOpt1Name" placeholder="Name (e.g. Handfree)">
+        <input class="form-input" id="pollOpt1Name" placeholder="Name (e.g. Handsfree)" oninput="renderPollIconGrid(1)">
+        <input class="form-input" id="pollOpt1Emoji" placeholder="Emoji (optional, e.g. 🏏)">
       </div>
+      <div class="icon-grid mini" id="pollOpt1Icons"></div>
+      <div class="poll-icon-note" id="pollOpt1IconNote"></div>
     </div>
-    <div class="form-group">
+    <div class="form-group poll-opt">
       <label class="form-label">Option 2</label>
       <div class="form-row">
-        <input class="form-input" id="pollOpt2Emoji" placeholder="Emoji (e.g. 🎵)">
-        <input class="form-input" id="pollOpt2Name" placeholder="Name (e.g. Airbuds)">
+        <input class="form-input" id="pollOpt2Name" placeholder="Name (e.g. Airbuds)" oninput="renderPollIconGrid(2)">
+        <input class="form-input" id="pollOpt2Emoji" placeholder="Emoji (optional, e.g. 🏏)">
       </div>
+      <div class="icon-grid mini" id="pollOpt2Icons"></div>
+      <div class="poll-icon-note" id="pollOpt2IconNote"></div>
     </div>
-    <div class="form-group">
+    <div class="form-group poll-opt">
       <label class="form-label">Option 3 (optional)</label>
       <div class="form-row">
-        <input class="form-input" id="pollOpt3Emoji" placeholder="Emoji">
-        <input class="form-input" id="pollOpt3Name" placeholder="Name">
+        <input class="form-input" id="pollOpt3Name" placeholder="Name" oninput="renderPollIconGrid(3)">
+        <input class="form-input" id="pollOpt3Emoji" placeholder="Emoji (optional, e.g. 🏏)">
       </div>
+      <div class="icon-grid mini" id="pollOpt3Icons"></div>
+      <div class="poll-icon-note" id="pollOpt3IconNote"></div>
     </div>
-    <div class="form-group">
+    <div class="form-group poll-opt">
       <label class="form-label">Option 4 (optional)</label>
       <div class="form-row">
-        <input class="form-input" id="pollOpt4Emoji" placeholder="Emoji">
-        <input class="form-input" id="pollOpt4Name" placeholder="Name">
+        <input class="form-input" id="pollOpt4Name" placeholder="Name" oninput="renderPollIconGrid(4)">
+        <input class="form-input" id="pollOpt4Emoji" placeholder="Emoji (optional, e.g. 🏏)">
       </div>
+      <div class="icon-grid mini" id="pollOpt4Icons"></div>
+      <div class="poll-icon-note" id="pollOpt4IconNote"></div>
     </div>
     <button class="submit-btn" onclick="createPoll()">Poll Banao ✅</button>
   </div>
@@ -2361,7 +2375,52 @@ async function confirmWinner() {
 }
 
 // ── Polls ─────────────────────────────────────────────────────────────────────
-function showAddPollModal() { document.getElementById('addPollModal').classList.add('show'); }
+// Poll option icons: '' = Auto (app guesses from the option name — same
+// guess as the app's prizeIconFor() in premium_popup.dart; keep both in sync).
+const pollIcons = ['', '', '', ''];
+function guessIconKey(name) {
+  const n = (name || '').toLowerCase();
+  const has = (...w) => w.some(x => n.includes(x));
+  if (has('earbud', 'airpod', 'airdot', 'buds')) return 'earbuds';
+  if (has('handfree', 'handsfree', 'hands free', 'hand free', 'earphone')) return 'handsfree';
+  if (has('headphone', 'headset', 'neckband')) return 'headphones';
+  if (has('power bank', 'powerbank')) return 'power_bank';
+  if (has('speaker')) return 'speaker';
+  if (has('keypad', 'nokia', 'feature phone')) return 'keypad_phone';
+  if (has('watch', 'band')) return 'watch';
+  if (has('laptop', 'macbook', ' pc')) return 'laptop';
+  if (has('console', 'ps5', 'xbox', 'controller', 'game')) return 'controller';
+  if (has('phone', 'mobile', 'galaxy', 'vivo', 'oppo', 'infinix', 'tecno', 'redmi', 'samsung',
+          'xiaomi', 'realme', 'itel', 'honor', 'huawei', 'pixel')) return 'phone';
+  return '';
+}
+function iconLabel(key) {
+  const f = PRIZE_ICONS.find(([k]) => k === key);
+  return f ? f[1] : key;
+}
+function renderPollIconGrid(i) {
+  const sel = pollIcons[i - 1];
+  document.getElementById('pollOpt' + i + 'Icons').innerHTML = PRIZE_ICONS.map(([key, label]) => `
+    <div class="icon-tile ${sel === key ? 'sel' : ''}" onclick="selectPollIcon(${i},'${key}')">
+      ${key === '' ? '<div class="auto">✨</div>'
+        : `<img src="prize_icons/${key}.png" alt="" onerror="this.style.visibility='hidden'">`}
+      ${label}
+    </div>`).join('');
+  const name = document.getElementById('pollOpt' + i + 'Name').value.trim();
+  const guess = guessIconKey(name);
+  document.getElementById('pollOpt' + i + 'IconNote').textContent = sel
+    ? '✅ Icon: ' + iconLabel(sel)
+    : (!name ? '' : guess ? '✨ Auto: ' + iconLabel(guess) + ' icon dikhega'
+                          : '✨ Auto: koi icon match nahi — emoji (ya 🎁) dikhega');
+}
+function selectPollIcon(i, key) {
+  pollIcons[i - 1] = key;
+  renderPollIconGrid(i);
+}
+function showAddPollModal() {
+  for (let i = 1; i <= 4; i++) renderPollIconGrid(i);
+  document.getElementById('addPollModal').classList.add('show');
+}
 
 async function createPoll() {
   const title = document.getElementById('pollTitle').value.trim();
@@ -2371,8 +2430,9 @@ async function createPoll() {
   for (let i = 1; i <= 4; i++) {
     const emoji = document.getElementById(`pollOpt${i}Emoji`).value.trim();
     const name = document.getElementById(`pollOpt${i}Name`).value.trim();
-    if (emoji && name) {
-      options.push({ id: `opt${i}`, emoji, name });
+    if (name) {
+      // emoji always saved (old app versions show only the emoji)
+      options.push({ id: `opt${i}`, emoji: emoji || '🎁', name, icon: pollIcons[i - 1] });
     }
   }
   if (options.length < 2) { showToast('❌ Kam se kam 2 options daalo!', true); return; }
@@ -2414,6 +2474,7 @@ async function createPoll() {
     for (let i = 1; i <= 4; i++) {
       document.getElementById(`pollOpt${i}Emoji`).value = '';
       document.getElementById(`pollOpt${i}Name`).value = '';
+      pollIcons[i - 1] = '';
     }
     loadPolls();
   } catch(e) { showToast('❌ Error: ' + e.message, true); }
@@ -2460,7 +2521,11 @@ async function loadPolls() {
         const v = Number((p.votes || {})[o.id]) || 0;
         const pct = totalVotes === 0 ? 0 : ((v / totalVotes) * 100).toFixed(0);
         return `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.05);">
-          <span>${escHtml(o.emoji)} ${escHtml(o.name)}</span>
+          <span>${(() => {
+            const k = o.icon || guessIconKey(o.name);
+            return k ? `<img src="prize_icons/${k}.png" alt="" style="width:22px;height:22px;object-fit:contain;vertical-align:middle;">`
+                     : escHtml(o.emoji || '🎁');
+          })()} ${escHtml(o.name)}</span>
           <span style="color:#F5C518;font-weight:bold;">${v} votes (${pct}%)</span>
         </div>`;
       }).join('');
