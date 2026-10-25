@@ -187,6 +187,15 @@
         <div id="expiredWinsList"><div class="loading" style="padding:16px;">Loading...</div></div>
       </div>
 
+      <div style="background:#16213E;border:1px solid rgba(240,165,0,0.5);border-radius:12px;padding:16px;margin-bottom:24px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+          <span style="font-size:15px;font-weight:bold;color:#F0A500;">⏰ Claim Pending (winner ne abhi claim nahi kiya)</span>
+          <span id="claimPendingCount" style="background:#F0A500;padding:2px 10px;border-radius:12px;font-size:12px;color:#1A1A2E;">0</span>
+        </div>
+        <div style="font-size:12px;color:#9E9E9E;margin-bottom:10px;">Orange = 24 ghante se kam baqi. 🔔 se winner ko reminder push jati hai.</div>
+        <div id="claimPendingList"><div class="loading" style="padding:16px;">Loading...</div></div>
+      </div>
+
       <div class="section-title">
         🎯 Draws Management
         <button class="add-draw-btn" onclick="showAddDrawModal()">+ New Draw</button>
@@ -556,6 +565,16 @@ Question2|OptA|OptB|OptC|OptD|0"></textarea>
         <div id="gameControlsList"><div class="loading" style="padding:16px;">Loading...</div></div>
       </div>
 
+      <div style="background:#16213E;border:1px solid rgba(155,89,182,0.5);border-radius:12px;padding:16px;margin-bottom:24px;">
+        <div style="font-size:15px;font-weight:bold;color:#9B59B6;margin-bottom:4px;">🧪 Testers (Test Draws dekh sakte hain)</div>
+        <div style="font-size:12px;color:#9E9E9E;margin-bottom:12px;">"Test Draw" sirf in accounts ko dikhta hai (admin Gmail hamesha). Gmail likhein — account pehle app mein login hona chahiye.</div>
+        <div style="display:flex;gap:8px;margin-bottom:10px;">
+          <input class="form-input" id="testerEmailInput" placeholder="tester@gmail.com" style="flex:1;">
+          <button class="btn" style="background:#9B59B6;color:white;" onclick="addTester()">+ Add</button>
+        </div>
+        <div id="testersList"><div class="loading" style="padding:10px;">Loading...</div></div>
+      </div>
+
     </div>
 
   </div>
@@ -628,6 +647,11 @@ Question2|OptA|OptB|OptC|OptD|0"></textarea>
     <div class="form-group">
       <label class="form-label">4th Entry Cost</label>
       <input class="form-input" id="newTicketCost4" type="number" value="60">
+    </div>
+    <div class="form-group" style="background:rgba(155,89,182,0.12);border:1px solid rgba(155,89,182,0.4);border-radius:10px;padding:10px;">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:#C39BD3;font-size:13px;font-weight:bold;">
+        <input type="checkbox" id="newIsTest"> 🧪 Test Draw (sirf testers ko dikhe — users ko nahi, koi broadcast push nahi)
+      </label>
     </div>
     <div class="form-row">
       <div class="form-group">
@@ -1466,6 +1490,7 @@ async function checkExpiredWins(preloadedDocs) {
       .where('winnerId', '!=', null)
       .get()).docs;
 
+    renderClaimPending(docs);
     const now = new Date();
     const expired = docs.filter(doc => {
       const d = doc.data();
@@ -1531,6 +1556,7 @@ async function rerollExpiredWinner(drawId) {
   try {
     const drawDoc = await db.collection('draws').doc(drawId).get();
     const oldWinnerId = drawDoc.data().winnerId;
+    rerollOldWinnerId = oldWinnerId || null;
 
     const snap = await db.collection('entries').where('drawId', '==', drawId).get();
     if (snap.docs.length === 0) { showToast('❌ Koi entry nahi!', true); return; }
@@ -2217,7 +2243,7 @@ function buildDrawCard(draw, showCollapse) {
       <div class="draw-card-header">
         <div class="draw-emoji">${escHtml(draw.prizeEmoji || '🎁')}</div>
         <div class="draw-info">
-          <div class="draw-name">${escHtml(draw.prizeName)}</div>
+          <div class="draw-name">${draw.isTest ? '<span style="background:#9B59B6;color:white;font-size:10px;padding:2px 6px;border-radius:6px;margin-right:6px;">🧪 TEST</span>' : ''}${escHtml(draw.prizeName)}</div>
           <div class="draw-desc">${escHtml(draw.prizeDescription || '')}</div>
           <div class="draw-value">PKR ${(draw.prizeValue || 0).toLocaleString()}</div>
           <div class="${dateClass}">${dateNote}</div>
@@ -2240,6 +2266,7 @@ function buildDrawCard(draw, showCollapse) {
         ${isPending ? `<button class="btn" style="background:rgba(155,89,182,0.3);color:#9B59B6;border:1px solid rgba(155,89,182,0.5);" onclick="startLiveDraw('${draw.id}')">🎬 Live Draw Chalao${draw.liveSoonPushSentAt && draw.liveSoonPushSentAt.seconds ? ` <span class="live-soon-timer" data-at="${Number(draw.liveSoonPushSentAt.seconds) * 1000}"></span>` : ''}</button>` : ''}
         ${isCompleted && draw.winnerName ? `<button class="btn" style="background:rgba(155,89,182,0.3);color:#9B59B6;border:1px solid rgba(155,89,182,0.5);" onclick="startLiveDraw('${draw.id}')">🎬 Live Draw Chalao</button>` : ''}
         ${isActive && !isPending ? `<button class="btn" style="background:${draw.isFeatured ? 'rgba(240,165,0,0.3)' : 'rgba(255,255,255,0.1)'}; color:${draw.isFeatured ? '#F0A500' : '#fff'}; border:1px solid ${draw.isFeatured ? '#F0A500' : 'rgba(255,255,255,0.2)'};" onclick="toggleFeatured('${draw.id}', ${draw.isFeatured === true})">${draw.isFeatured ? '⭐ Featured' : '☆ Feature Karo'}</button>` : ''}
+        ${isActive && !isPending ? `<button class="btn" style="background:rgba(46,204,113,0.15);color:#2ECC71;border:1px solid rgba(46,204,113,0.4);" onclick="copyDraw('${draw.id}')">📋 Copy ×N</button>` : ''}
         <button class="btn btn-delete" onclick="deleteDraw('${draw.id}')">🗑️ Delete</button>
         ${showCollapse ? `<button class="btn" style="background:rgba(255,255,255,0.08);color:#9E9E9E;" onclick="toggleExpand('${draw.id}')">▲ Collapse</button>` : ''}
       </div>
@@ -2278,6 +2305,7 @@ async function viewEntries(drawId) {
 async function selectWinner(drawId) {
   winnerRollCount = 0;
   winnerRollReason = 'first_pick';
+  rerollOldWinnerId = null;
   currentDrawId = drawId;
   currentEntries = [];
   showToast('Entries load ho rahi hain...', false);
@@ -2305,6 +2333,7 @@ async function selectWinner(drawId) {
 // which can never be edited or deleted.
 let winnerRollCount = 0;
 let winnerRollReason = 'first_pick';
+let rerollOldWinnerId = null; // set by "Naya Winner Chuno" (expired win)
 
 function fairRandomIndex(n) {
   const limit = Math.floor(4294967296 / n) * n;
@@ -2395,7 +2424,22 @@ async function confirmWinner() {
       type: 'winner', sent: false,
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
     });
-    await db.collection('broadcast_notifications').add({
+    // F: the old winner (claim time ran out) loses this win: Wins −1, and the
+    // app shows them a polite "claim ka waqt khatam" message once
+    if (rerollOldWinnerId && rerollOldWinnerId !== selectedWinner.userId) {
+      try {
+        await db.collection('draws').doc(currentDrawId).update({
+          previousWinnerIds: firebase.firestore.FieldValue.arrayUnion(rerollOldWinnerId),
+        });
+        await db.collection('users').doc(rerollOldWinnerId).update({
+          totalWins: firebase.firestore.FieldValue.increment(-1),
+        });
+        logAudit('old_winner_removed', { drawId: currentDrawId, oldWinnerId: rerollOldWinnerId });
+      } catch (e) { console.error('old winner update', e); }
+    }
+    rerollOldWinnerId = null;
+    // 🧪 Test draw: no "Naya Draw Result" for all users
+    if (drawDataForWinner.isTest !== true) await db.collection('broadcast_notifications').add({
       title: '🎁 Naya Draw Result!',
       body: 'Draw ka result aa gaya hai! Winners Screen mein dekhein.',
       topic: 'all_users', type: 'draw_result', sent: false,
@@ -2730,6 +2774,7 @@ async function createDraw() {
   const ticketCost4 = parseInt(document.getElementById('newTicketCost4').value) || 60;
   const drawType = document.getElementById('newDrawType').value;
   const isTargetBased = drawType === 'target';
+  const isTest = document.getElementById('newIsTest').checked === true;
   if (!prizeName) { showToast('❌ Prize name daalo!', true); return; }
   if (prizePic.new.uploading) { showToast('⏳ Photo upload hone dein, phir dobara dabayein', true); return; }
   const data = {
@@ -2737,6 +2782,7 @@ async function createDraw() {
     prizeIcon: prizePic.new.icon, prizeImageUrl: prizePic.new.photo,
     prizeValue, ticketCost, ticketCost2, ticketCost3, ticketCost4,
     isTargetBased, status: 'active', currentEntries: 0, isFeatured: false,
+    isTest,
     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
   };
   if (isTargetBased) {
@@ -2754,7 +2800,8 @@ async function createDraw() {
     closeModal('addDrawModal');
     setPrizePic('new', '', '');
     showToast('✅ Naya draw ban gaya!', false);
-    await db.collection('broadcast_notifications').add({
+    document.getElementById('newIsTest').checked = false;
+    if (!isTest) await db.collection('broadcast_notifications').add({
       title: '🎉 Naya Draw Available!',
       body: `${data.prizeName} — Ab enter karo aur jeetnay ka mauka pao!`,
       topic: 'new_draws', type: 'new_draw', sent: false,
@@ -2856,7 +2903,7 @@ async function sendLiveDrawPushes(drawId, prizeName) {
 
     // Everyone first, then the winner's personal message a few seconds later,
     // so on the winner's phone "Mubarak Ho" is the newest one on top.
-    await sendPush({
+    if (d.isTest !== true) await sendPush({
       topic: 'all_users',
       title: '🎁 Naya Draw Result!',
       body: `${prizeName} ka winner chun liya gaya hai. Winners Screen mein dekhein!`,
@@ -2964,6 +3011,7 @@ function bumpDrawsSignal() {
 async function announceLiveDrawSoon(drawId) {
   const draw = findDraw(drawId);
   if (!draw) { showToast('❌ Draw nahi mila, page refresh karo', true); return; }
+  if (draw.isTest === true) { showToast('🧪 Test draw — yeh alert sab users ko jata hai, is liye band hai. Seedha "Live Draw Chalao" dabayein.', true); return; }
   const prizeName = draw.prizeName || 'Prize';
   const already = draw.liveSoonPushSentAt
     ? '\n\n⚠️ Yeh alert is draw ke liye pehle bhi bhej chuke ho.'
@@ -3005,6 +3053,7 @@ async function startLiveDraw(drawId) {
     for (const doc of existing.docs) await db.collection('live_draws').doc(doc.id).update({ status: 'completed' });
     await db.collection('live_draws').add({
       drawId, prizeName, prizeEmoji, winnerName, names,
+      isTest: draw.isTest === true,
       status: 'active',
       startedAt: firebase.firestore.FieldValue.serverTimestamp(),
     });
@@ -3029,6 +3078,7 @@ async function startLiveDraw(drawId) {
         await db.collection('winners').add({
           drawId,
           userId: fresh.winnerId,
+          isTest: fresh.isTest === true,
           winnerName: fresh.winnerName || '',
           winnerEmail: fresh.winnerEmail || '',
           prizeName: fresh.prizeName || '',
@@ -3942,8 +3992,11 @@ async function loadAppControls() {
       maintenanceMessage: data.maintenanceMessage || '',
       games: data.games || {},
       minBuild: Number(data.minBuild) || 0,
+      testers: Array.isArray(data.testers) ? data.testers : [],
+      testerLabels: data.testerLabels || {},
     };
     renderAppControls();
+    renderTesters();
   } catch(e) {
     document.getElementById('gameControlsList').innerHTML = '<div class="loading">Error: ' + e.message + '</div>';
   }
@@ -4031,6 +4084,165 @@ async function toggleGame(key) {
     showToast(enabled ? `🔴 ${game.label} disabled` : `🟢 ${game.label} active`, false);
     loadAppControls();
   } catch(e) { showToast('❌ Error: ' + e.message, true); }
+}
+
+// ── 📋 Copy draw ×N (same prize, several draws) ────────────────────────────
+async function copyDraw(drawId) {
+  const draw = findDraw(drawId);
+  if (!draw) { showToast('❌ Draw nahi mila, page refresh karo', true); return; }
+  if (draw.status !== 'active' || draw.pendingCompletion === true) { showToast('❌ Sirf active draw copy ho sakta hai', true); return; }
+  const base = (draw.prizeName || '').replace(/\s*\(\d+\/\d+\)\s*$/, '');
+  const raw = prompt(`"${base}" — total kitne draws chahiye (is wale ko mila kar)?\n\nMisal: 5 → yeh "(1/5)" ban jayega aur 4 naye "(2/5)"…"(5/5)" banenge.`, '5');
+  if (raw === null) return;
+  const total = parseInt(raw, 10);
+  if (isNaN(total) || total < 2 || total > 20) { showToast('❌ 2 se 20 tak number likhein', true); return; }
+  if (!confirm(`${total - 1} naye draws banenge: "${base} (2/${total})" … "(${total}/${total})"\nAur yeh wala "${base} (1/${total})" ho jayega.\n\nTheek hai?`)) return;
+  try {
+    const keep = ['prizeEmoji', 'prizeDescription', 'prizeIcon', 'prizeImageUrl', 'prizeValue',
+      'ticketCost', 'ticketCost2', 'ticketCost3', 'ticketCost4', 'isTargetBased', 'targetPlayers',
+      'drawDate', 'isTest'];
+    const batch = db.batch();
+    batch.update(db.collection('draws').doc(drawId), { prizeName: `${base} (1/${total})` });
+    for (let i = 2; i <= total; i++) {
+      const data = {
+        prizeName: `${base} (${i}/${total})`,
+        status: 'active', currentEntries: 0, isFeatured: false,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      };
+      keep.forEach(k => { if (draw[k] !== undefined) data[k] = draw[k]; });
+      batch.set(db.collection('draws').doc(), data);
+    }
+    await batch.commit();
+    logAudit('draw_copied', { drawId, prize: base, total });
+    bumpDrawsSignal();
+    showToast(`✅ ${total - 1} copies ban gayi!`, false);
+    setTimeout(() => loadDashboard(), 800);
+  } catch (e) { showToast('❌ Error: ' + e.message, true); }
+}
+
+// ── ⏰ Claim Pending list + reminder (G) ─────────────────────────────────────
+function renderClaimPending(docs) {
+  const el = document.getElementById('claimPendingList');
+  if (!el) return;
+  const nowMs = serverNow();
+  const pending = docs.map(doc => ({ id: doc.id, d: doc.data() })).filter(({ d }) =>
+    d.winnerId && d.claimSubmitted !== true && d.pendingCompletion !== true &&
+    d.winnerClaimDeadline && d.winnerClaimDeadline.seconds * 1000 > nowMs)
+    .sort((a, b) => a.d.winnerClaimDeadline.seconds - b.d.winnerClaimDeadline.seconds);
+  document.getElementById('claimPendingCount').textContent = pending.length;
+  if (pending.length === 0) {
+    el.innerHTML = '<div class="loading" style="padding:16px;">✅ Koi claim pending nahi</div>';
+    return;
+  }
+  el.innerHTML = pending.map(({ id, d }) => {
+    const msLeft = d.winnerClaimDeadline.seconds * 1000 - nowMs;
+    const h = Math.floor(msLeft / 3600000);
+    const m = Math.floor((msLeft % 3600000) / 60000);
+    const left = h > 0 ? `${h} ghante ${m} min` : `${m} min`;
+    const soon = msLeft < 24 * 3600000;
+    return `
+      <div class="draw-card" style="border-color:${soon ? 'rgba(240,165,0,0.8)' : 'rgba(52,152,219,0.4)'};">
+        <div class="draw-card-header">
+          <div class="draw-emoji">${escHtml(d.prizeEmoji || '🎁')}</div>
+          <div class="draw-info">
+            <div class="draw-name">${d.isTest ? '🧪 ' : ''}${escHtml(d.prizeName)}</div>
+            <div class="draw-desc">Winner: ${escHtml(d.winnerName || 'Unknown')}</div>
+            <div style="color:${soon ? '#F0A500' : '#3498DB'};font-size:13px;font-weight:bold;">⏰ ${left} baqi</div>
+          </div>
+        </div>
+        <div class="draw-actions">
+          <button class="btn" style="background:rgba(240,165,0,0.2);color:#F0A500;border:1px solid rgba(240,165,0,0.5);" data-id="${escHtml(id)}" onclick="sendClaimReminder(this.dataset.id)">🔔 Reminder Bhejo${d.lastClaimReminderAt ? ' ✓' : ''}</button>
+          ${d.isTest ? `<button class="btn" style="background:rgba(155,89,182,0.3);color:#C39BD3;border:1px solid rgba(155,89,182,0.5);" data-id="${escHtml(id)}" onclick="testDeadline5min(this.dataset.id)">⏱ Test: Deadline 5 min</button>` : ''}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function sendClaimReminder(drawId) {
+  try {
+    const ref = db.collection('draws').doc(drawId);
+    const d = (await ref.get()).data() || {};
+    if (!d.winnerId || !d.winnerClaimDeadline) return;
+    const msLeft = d.winnerClaimDeadline.seconds * 1000 - serverNow();
+    if (msLeft <= 0) { showToast('❌ Deadline guzar chuki hai', true); return; }
+    const timeText = msLeft >= 2 * 3600000 ? `${Math.floor(msLeft / 3600000)} ghante`
+      : msLeft >= 3600000 ? '1 ghanta' : `${Math.max(1, Math.floor(msLeft / 60000))} minute`;
+    const body = `Aap ne ${d.prizeName || 'prize'} jeeta hai — sirf ${timeText} baqi hain! App kholein aur abhi claim karein.`;
+    if (!confirm(`${d.winnerName || 'Winner'} ko yeh reminder bhejein?\n\n"⏰ ${body}"`)) return;
+    const u = await db.collection('users').doc(d.winnerId).get();
+    const token = await getFcmToken(d.winnerId, u.exists ? u.data() : null);
+    if (!token) { showToast('⚠️ Is user ka notification token nahi mila', true); return; }
+    const ok = await sendPush({ token, title: '⏰ Apna Prize Claim Karein!', body, type: 'winner' });
+    if (!ok) return;
+    await ref.update({ lastClaimReminderAt: firebase.firestore.FieldValue.serverTimestamp() });
+    logAudit('claim_reminder_sent', { drawId, winnerId: d.winnerId });
+    showToast('✅ Reminder bhej diya', false);
+    setTimeout(() => loadDashboard(), 800);
+  } catch (e) { showToast('❌ Error: ' + e.message, true); }
+}
+
+// 🧪 Test only: claim deadline in 5 minutes (to test expiry without waiting 2 days)
+async function testDeadline5min(drawId) {
+  try {
+    const ref = db.collection('draws').doc(drawId);
+    const d = (await ref.get()).data() || {};
+    if (d.isTest !== true) { showToast('❌ Yeh sirf TEST draw par chalta hai', true); return; }
+    if (!confirm('Test: is draw ki claim deadline 5 minute baad kar dein?')) return;
+    await ref.update({
+      winnerClaimDeadline: firebase.firestore.Timestamp.fromDate(new Date(serverNow() + 5 * 60 * 1000)),
+    });
+    showToast('⏱ Deadline 5 minute baad — phir "Expired" list mein aayega', false);
+    setTimeout(() => loadDashboard(), 800);
+  } catch (e) { showToast('❌ Error: ' + e.message, true); }
+}
+
+// ── 🧪 Testers list ──────────────────────────────────────────────────────────
+function renderTesters() {
+  const el = document.getElementById('testersList');
+  if (!el) return;
+  const list = appControlsCache.testers || [];
+  const labels = appControlsCache.testerLabels || {};
+  el.innerHTML = list.length === 0
+    ? '<div class="loading" style="padding:10px;">Koi tester nahi (admin Gmail hamesha tester hai)</div>'
+    : list.map(uid => `
+      <div class="entry-item">
+        <div class="entry-user">🧪 ${escHtml(labels[uid] || uid)}</div>
+        <button class="btn btn-delete" style="padding:6px 12px;font-size:12px;" data-uid="${escHtml(uid)}" onclick="removeTester(this.dataset.uid)">Hatao</button>
+      </div>`).join('');
+}
+
+async function addTester() {
+  const input = document.getElementById('testerEmailInput');
+  const email = (input.value || '').trim().toLowerCase();
+  if (!email || !email.includes('@')) { showToast('❌ Sahi Gmail likhein', true); return; }
+  try {
+    const snap = await db.collection('users_private').where('email', '==', email).limit(1).get();
+    if (snap.empty) { showToast('❌ Is Gmail ka account nahi mila (pehle app mein login karein)', true); return; }
+    const uid = snap.docs[0].id;
+    await db.collection('config').doc('app_controls').set({
+      testers: firebase.firestore.FieldValue.arrayUnion(uid),
+      testerLabels: { [uid]: maskEmail(email) },
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+    input.value = '';
+    logAudit('tester_added', { uid });
+    showToast('✅ Tester add ho gaya', false);
+    loadAppControls();
+  } catch (e) { showToast('❌ Error: ' + e.message, true); }
+}
+
+async function removeTester(uid) {
+  if (!confirm('Is tester ko hatana hai? Ab yeh Test Draws nahi dekh sakega.')) return;
+  try {
+    await db.collection('config').doc('app_controls').set({
+      testers: firebase.firestore.FieldValue.arrayRemove(uid),
+      testerLabels: { [uid]: firebase.firestore.FieldValue.delete() },
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+    logAudit('tester_removed', { uid });
+    showToast('🗑️ Tester hata diya', false);
+    loadAppControls();
+  } catch (e) { showToast('❌ Error: ' + e.message, true); }
 }
 
 function closeModal(id) { document.getElementById(id).classList.remove('show'); }
