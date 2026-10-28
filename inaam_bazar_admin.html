@@ -233,7 +233,12 @@
           <button class="btn" style="background:#3498DB;color:white;" onclick="searchUsers()">Search</button>
         </div>
         <div style="font-size:11px;color:#9E9E9E;margin-bottom:12px;">Email poora likhna hoga. Naam ka shuruaati hissa likho, bilkul waise hi (capital/small letters) jaise profile mein hai.</div>
-        <div id="userSearchResults"></div>
+       <div id="userSearchResults"></div>
+        <div style="border-top:1px solid rgba(255,255,255,0.08);margin-top:12px;padding-top:12px;">
+          <button class="btn" style="background:rgba(39,174,96,0.2);color:#27AE60;border:1px solid rgba(39,174,96,0.4);" onclick="loadActiveToday()">📅 Aaj ke Active Users</button>
+          <div style="font-size:11px;color:#9E9E9E;margin-top:6px;">Aaj 12 AM (Pakistan time) se jis ne login kiya, Rozana Bonus liya ya koi game kheli.</div>
+          <div id="activeTodayResults" style="margin-top:10px;"></div>
+        </div>
       </div>
       <div style="background:#16213E;border:1px solid rgba(142,68,173,0.4);border-radius:12px;padding:16px;margin-bottom:24px;">
         <div onclick="togglePendingSection()" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
@@ -3758,6 +3763,49 @@ function escHtml(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
+// ── Aaj ke Active Users ──────────────────────────────────────────────────────
+// Active today = since 12 AM Pakistan time: logged in / claimed Rozana Bonus
+// (lastLogin) or played any game (last_<game>_play). One small query per
+// field, results merged. Reads = only users active today.
+async function loadActiveToday() {
+  const ACTIVE_FIELDS = [
+    { field: 'lastLogin', label: 'Login / Rozana Bonus' },
+    ...GAME_CONTROLS.map(g => ({ field: 'last_' + g.key + '_play', label: g.emoji + ' ' + g.label })),
+  ];
+  const box = document.getElementById('activeTodayResults');
+  box.innerHTML = '<div class="loading" style="padding:16px;">Loading...</div>';
+  // 12 AM today in Pakistan (UTC+5), whatever the computer's time zone is
+  const PK = 5 * 3600 * 1000;
+  const pk = new Date(Date.now() + PK);
+  const start = new Date(Date.UTC(pk.getUTCFullYear(), pk.getUTCMonth(), pk.getUTCDate()) - PK);
+  const users = {};
+  let failed = 0;
+  await Promise.all(ACTIVE_FIELDS.map(f =>
+    db.collection('users').where(f.field, '>=', start).limit(500).get().then(snap => {
+      snap.docs.forEach(d => {
+        const ts = d.data()[f.field];
+        const ms = ts && ts.seconds ? ts.seconds * 1000 : 0;
+        const u = users[d.id] || (users[d.id] = { id: d.id, name: d.data().name, tickets: d.data().tickets, last: 0, what: '' });
+        if (ms > u.last) { u.last = ms; u.what = f.label; }
+      });
+    }).catch(e => { failed++; console.error('active ' + f.field, e); })
+  ));
+  const list = Object.values(users).sort((a, b) => b.last - a.last);
+  const time = (ms) => new Date(ms).toLocaleTimeString('en-PK', { hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Karachi' });
+  box.innerHTML =
+    `<div style="font-size:14px;font-weight:bold;color:#27AE60;margin-bottom:8px;">🟢 Aaj ${list.length} users active</div>`
+    + (failed ? `<div style="font-size:11px;color:#E74C3C;margin-bottom:8px;">⚠️ ${failed} list load nahi hui, count thoda kam ho sakta hai.</div>` : '')
+    + (list.length === 0 ? '<div class="loading" style="padding:8px;">Aaj abhi tak koi active nahi.</div>' : '')
+    + list.map(u => `
+      <div class="entry-item" style="cursor:pointer;" data-uid="${escHtml(u.id)}" onclick="openUserInLookup(this.dataset.uid)">
+        <div style="min-width:0;">
+          <div class="entry-user">${escHtml(u.name || 'User')}</div>
+          <div class="entry-detail">${escHtml(u.what)} • ${time(u.last)}</div>
+        </div>
+        <div class="entry-detail" style="white-space:nowrap;">🎟️ ${escHtml(u.tickets || 0)}</div>
+      </div>`).join('');
+}
+ 
 async function searchUsers() {
   const term = document.getElementById('userSearchInput').value.trim();
   const box = document.getElementById('userSearchResults');
