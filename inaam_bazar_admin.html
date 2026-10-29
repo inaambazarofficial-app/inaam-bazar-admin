@@ -2056,6 +2056,9 @@ const FS_PROJECT_ID = 'inaam-bazar';
 async function restCount(collectionId, filters) {
   try {
     const token = await auth.currentUser.getIdToken();
+    // App Check proof for these direct Firestore calls (else they count as "unknown origin")
+    const headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token };
+    try { headers['X-Firebase-AppCheck'] = (await firebase.appCheck().getToken()).token; } catch (e) {}
     const toValue = (v) => typeof v === 'boolean' ? { booleanValue: v }
       : typeof v === 'number' ? (Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v })
       : v instanceof Date ? { timestampValue: v.toISOString() }
@@ -2072,7 +2075,7 @@ async function restCount(collectionId, filters) {
     const res = await fetch('https://firestore.googleapis.com/v1/projects/' + FS_PROJECT_ID +
         '/databases/(default)/documents:runAggregationQuery', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      headers,
       body: JSON.stringify({ structuredAggregationQuery: {
         aggregations: [{ alias: 'n', count: {} }], structuredQuery } }),
     });
