@@ -1929,6 +1929,16 @@ function renderClaims() {
     if (p.length >= 10) (usersByPhone[p] = usersByPhone[p] || new Set()).add(c.userId);
     if (a.length >= 12) (usersByAddr[a] = usersByAddr[a] || new Set()).add(c.userId);
   });
+  // SECURITY: a claim must come from the draw's real winner. The app only
+  // lets winners claim, but a tampered app could send a fake claim — so the
+  // admin panel checks the draw itself before anything is shipped.
+  const winnerWarning = (c) => {
+    const d = allDrawsCache.find(x => x.id === c.drawId);
+    if (!d) return `<div style="background:rgba(243,156,18,0.15);border:1px solid #F39C12;color:#F39C12;border-radius:8px;padding:8px 10px;margin-bottom:10px;font-size:12px;">⚠️ Is claim ka draw nahi mila (${escHtml(c.drawId || '')}). Prize bhejne se pehle Draws tab mein check karein.</div>`;
+    if (d.winnerId !== c.userId) return `<div style="background:rgba(231,76,60,0.18);border:1px solid #E74C3C;color:#FF7B6B;border-radius:8px;padding:8px 10px;margin-bottom:10px;font-size:12px;font-weight:bold;">🚫 FAKE CLAIM? Yeh user is draw ka winner NAHI hai. Winner: ${escHtml(d.winnerName || d.winnerId || '-')}. Kuch na bhejein.</div>`;
+    if ((d.prizeName || '') !== (c.prizeName || '')) return `<div style="background:rgba(243,156,18,0.15);border:1px solid #F39C12;color:#F39C12;border-radius:8px;padding:8px 10px;margin-bottom:10px;font-size:12px;">⚠️ Prize name match nahi karta — draw mein: ${escHtml(d.prizeName || '')}. Draw wala prize hi bhejein.</div>`;
+    return '';
+  };
   const dupWarning = (c) => {
     const p = phoneKey(c.phone), a = addrKey(c);
     const samePhone = p.length >= 10 && usersByPhone[p] && usersByPhone[p].size > 1;
@@ -1969,6 +1979,7 @@ function renderClaims() {
             <div style="font-size:14px;color:white;font-weight:bold;">${escHtml(c.phone || '-')}</div>
           </div>
         </div>
+        ${winnerWarning(c)}
         ${dupWarning(c)}
         <div style="background:rgba(0,0,0,0.2);border-radius:8px;padding:10px;margin-bottom:12px;">
           <div style="font-size:11px;color:#9E9E9E;margin-bottom:4px;">📍 Address</div>
