@@ -3078,6 +3078,8 @@ async function startLiveDraw(drawId) {
     await db.collection('live_draws').add({
       drawId, prizeName, prizeEmoji, winnerName, names,
       isTest: draw.isTest === true,
+      // D: pehle winner ne claim nahi kiya tha → app "Dobara Draw" dikhata hai
+      isRedraw: Array.isArray(draw.previousWinnerIds) && draw.previousWinnerIds.length > 0,
       status: 'active',
       startedAt: firebase.firestore.FieldValue.serverTimestamp(),
     });
@@ -3094,6 +3096,10 @@ async function startLiveDraw(drawId) {
         completedAt: firebase.firestore.FieldValue.serverTimestamp(),
         winnerClaimDeadline: firebase.firestore.Timestamp.fromDate(new Date(Date.now() + 48 * 60 * 60 * 1000)), // 2 days to claim
         claimSubmitted: false,
+        // fresh claim window (also after a re-draw) → reminders start again
+        autoReminder24At: firebase.firestore.FieldValue.delete(),
+        autoReminder6At: firebase.firestore.FieldValue.delete(),
+        lastClaimReminderAt: firebase.firestore.FieldValue.delete(),
       });
       // Now the winner becomes public: Latest Winners list + win count
       if (fresh.winnerId) {
@@ -3247,6 +3253,8 @@ async function awardReferrerRescue(refDocId) {
       'totalReferrals': firebase.firestore.FieldValue.increment(1),
       'ticketsFromReferrals': firebase.firestore.FieldValue.increment(tickets),
       'missionFriendInvited': true,
+      // build 10 rules: the daily missions bonus needs this server stamp
+      'missionFriendAt': firebase.firestore.FieldValue.serverTimestamp(),
     });
     await db.collection('tickets_log').add({
       'userId': referrerId, 'amount': tickets, 'type': 'credit',
@@ -4197,6 +4205,7 @@ function renderClaimPending(docs) {
     d.winnerClaimDeadline && d.winnerClaimDeadline.seconds * 1000 > nowMs)
     .sort((a, b) => a.d.winnerClaimDeadline.seconds - b.d.winnerClaimDeadline.seconds);
   document.getElementById('claimPendingCount').textContent = pending.length;
+  autoClaimReminders(pending); // B: 24h / 6h reminders, sent by themselves
   if (pending.length === 0) {
     el.innerHTML = '<div class="loading" style="padding:16px;">✅ Koi claim pending nahi</div>';
     return;
@@ -4217,12 +4226,52 @@ function renderClaimPending(docs) {
             <div style="color:${soon ? '#F0A500' : '#3498DB'};font-size:13px;font-weight:bold;">⏰ ${left} baqi</div>
           </div>
         </div>
+        <div style="font-size:11px;color:#9E9E9E;margin-bottom:8px;">Auto reminder: 24h ${d.autoReminder24At ? '✅' : '—'} &nbsp;•&nbsp; 6h ${d.autoReminder6At ? '✅' : '—'}</div>
         <div class="draw-actions">
           <button class="btn" style="background:rgba(240,165,0,0.2);color:#F0A500;border:1px solid rgba(240,165,0,0.5);" data-id="${escHtml(id)}" onclick="sendClaimReminder(this.dataset.id)">🔔 Reminder Bhejo${d.lastClaimReminderAt ? ' ✓' : ''}</button>
           ${d.isTest ? `<button class="btn" style="background:rgba(155,89,182,0.3);color:#C39BD3;border:1px solid rgba(155,89,182,0.5);" data-id="${escHtml(id)}" onclick="testDeadline5min(this.dataset.id)">⏱ Test: Deadline 5 min</button>` : ''}
         </div>
       </div>`;
   }).join('');
+}
+
+// B: automatic claim reminders. Runs every time the admin panel loads the
+// draws (the panel must be OPEN — there is no server that does it alone).
+//   24 ghante se kam baqi → 1 reminder   |   6 ghante se kam baqi → 1 aur
+// Each one is sent only once per draw (autoReminder24At / autoReminder6At).
+let autoRemindersRunning = false;
+async function autoClaimReminders(pending) {
+  if (autoRemindersRunning) return;
+  autoRemindersRunning = true;
+  try {
+    for (const { id, d } of pending) {
+      const msLeft = d.winnerClaimDeadline.seconds * 1000 - serverNow();
+      if (msLeft <= 0) continue;
+      const need6 = msLeft <= 6 * 3600000 && !d.autoReminder6At;
+      const need24 = msLeft <= 24 * 3600000 && !d.autoReminder24At && !need6;
+      if (!need6 && !need24) continue;
+      const ref = db.collection('draws').doc(id);
+      // Mark FIRST (so two open admin tabs can't both send it)
+      const stamp = firebase.firestore.FieldValue.serverTimestamp();
+      await ref.update(need6
+        ? { autoReminder6At: stamp, autoReminder24At: d.autoReminder24At || stamp }
+        : { autoReminder24At: stamp });
+      const timeText = msLeft >= 2 * 3600000 ? `${Math.floor(msLeft / 3600000)} ghante`
+        : msLeft >= 3600000 ? '1 ghanta' : `${Math.max(1, Math.floor(msLeft / 60000))} minute`;
+      const u = await db.collection('users').doc(d.winnerId).get();
+      const token = await getFcmToken(d.winnerId, u.exists ? u.data() : null);
+      if (!token) continue;
+      const ok = await sendPush({
+        token, title: '⏰ Apna Prize Claim Karein!', type: 'winner',
+        body: `Aap ne ${d.prizeName || 'prize'} jeeta hai — sirf ${timeText} baqi hain! App kholein aur abhi claim karein.`,
+      });
+      if (ok) {
+        logAudit('claim_reminder_auto', { drawId: id, winnerId: d.winnerId, kind: need6 ? '6h' : '24h' });
+        showToast(`🔔 Auto reminder gaya: ${d.winnerName || 'winner'} (${need6 ? '6h' : '24h'})`, false);
+      }
+    }
+  } catch (e) { console.error('autoClaimReminders', e); }
+  autoRemindersRunning = false;
 }
 
 async function sendClaimReminder(drawId) {
