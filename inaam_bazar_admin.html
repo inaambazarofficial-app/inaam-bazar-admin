@@ -632,7 +632,11 @@ Question2|OptA|OptB|OptC|OptD|0"></textarea>
     <div class="form-row">
       <div class="form-group">
         <label class="form-label">Prize Value (PKR)</label>
-        <input class="form-input" id="newPrizeValue" type="number" placeholder="e.g. 50000">
+        <input class="form-input" id="newPrizeValue" type="number" placeholder="e.g. 1000">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Value Tak (optional)</label>
+        <input class="form-input" id="newPrizeValueMax" type="number" placeholder="e.g. 2000 → 1,000 – 2,000">
       </div>
       <div class="form-group">
         <label class="form-label">1st Entry Cost</label>
@@ -716,6 +720,10 @@ Question2|OptA|OptB|OptC|OptD|0"></textarea>
       <div class="form-group">
         <label class="form-label">Prize Value (PKR)</label>
         <input class="form-input" id="editPrizeValue" type="number">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Value Tak (optional)</label>
+        <input class="form-input" id="editPrizeValueMax" type="number" placeholder="khali = ek hi value">
       </div>
       <div class="form-group">
         <label class="form-label">1st Entry Cost</label>
@@ -2270,7 +2278,7 @@ function buildDrawCard(draw, showCollapse) {
         <div class="draw-info">
           <div class="draw-name">${draw.isTest ? '<span style="background:#9B59B6;color:white;font-size:10px;padding:2px 6px;border-radius:6px;margin-right:6px;">🧪 TEST</span>' : ''}${escHtml(draw.prizeName)}</div>
           <div class="draw-desc">${escHtml(draw.prizeDescription || '')}</div>
-          <div class="draw-value">PKR ${(draw.prizeValue || 0).toLocaleString()}</div>
+          <div class="draw-value">PKR ${valueText(draw)}</div>
           <div class="${dateClass}">${dateNote}</div>
         </div>
         <span class="status-badge ${isActive ? 'status-active' : 'status-completed'}">
@@ -2787,11 +2795,23 @@ function toggleDrawType() {
   document.getElementById('drawDateGroup').style.display = type === 'date' ? 'block' : 'none';
 }
 
+// Prize value range: "Value Tak" only counts when it is bigger than the
+// value itself (0 = no range, the app shows one number).
+function cleanValueMax(value, rawMax) {
+  const max = parseInt(rawMax) || 0;
+  return max > value ? max : 0;
+}
+function valueText(draw) {
+  const v = draw.prizeValue || 0, m = draw.prizeValueMax || 0;
+  return m > v ? `${v.toLocaleString()} – ${m.toLocaleString()}` : v.toLocaleString();
+}
+
 async function createDraw() {
   const prizeName = document.getElementById('newPrizeName').value.trim();
   const prizeEmoji = document.getElementById('newEmoji').value.trim();
   const prizeDesc = document.getElementById('newPrizeDesc').value.trim();
   const prizeValue = parseInt(document.getElementById('newPrizeValue').value) || 0;
+  const prizeValueMax = cleanValueMax(prizeValue, document.getElementById('newPrizeValueMax').value);
   const ticketCost = parseInt(document.getElementById('newTicketCost').value) || 15;
   const ticketCost2 = parseInt(document.getElementById('newTicketCost2').value) || 25;
   const ticketCost3 = parseInt(document.getElementById('newTicketCost3').value) || 40;
@@ -2804,7 +2824,7 @@ async function createDraw() {
   const data = {
     prizeName, prizeEmoji, prizeDescription: prizeDesc,
     prizeIcon: prizePic.new.icon, prizeImageUrl: prizePic.new.photo,
-    prizeValue, ticketCost, ticketCost2, ticketCost3, ticketCost4,
+    prizeValue, prizeValueMax, ticketCost, ticketCost2, ticketCost3, ticketCost4,
     isTargetBased, status: 'active', currentEntries: 0, isFeatured: false,
     isTest,
     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -2846,6 +2866,7 @@ function showEditDrawModal(drawId) {
   document.getElementById('editPrizeName').value = draw.prizeName || '';
   document.getElementById('editPrizeDesc').value = draw.prizeDescription || '';
   document.getElementById('editPrizeValue').value = draw.prizeValue || 0;
+  document.getElementById('editPrizeValueMax').value = draw.prizeValueMax || '';
   document.getElementById('editTicketCost').value = draw.ticketCost || 15;
   document.getElementById('editTicketCost2').value = draw.ticketCost2 || 25;
   document.getElementById('editTicketCost3').value = draw.ticketCost3 || 40;
@@ -2884,6 +2905,8 @@ async function saveEditDraw() {
     prizeName: document.getElementById('editPrizeName').value.trim(),
     prizeDescription: document.getElementById('editPrizeDesc').value.trim(),
     prizeValue: parseInt(document.getElementById('editPrizeValue').value) || 0,
+    prizeValueMax: cleanValueMax(parseInt(document.getElementById('editPrizeValue').value) || 0,
+      document.getElementById('editPrizeValueMax').value),
     ticketCost: parseInt(document.getElementById('editTicketCost').value) || 15,
     ticketCost2: parseInt(document.getElementById('editTicketCost2').value) || 25,
     ticketCost3: parseInt(document.getElementById('editTicketCost3').value) || 40,
@@ -4173,7 +4196,7 @@ async function copyDraw(drawId) {
   if (isNaN(total) || total < 2 || total > 20) { showToast('❌ 2 se 20 tak number likhein', true); return; }
   if (!confirm(`${total - 1} naye draws banenge: "${base} (2/${total})" … "(${total}/${total})"\nAur yeh wala "${base} (1/${total})" ho jayega.\n\nTheek hai?`)) return;
   try {
-    const keep = ['prizeEmoji', 'prizeDescription', 'prizeIcon', 'prizeImageUrl', 'prizeValue',
+    const keep = ['prizeEmoji', 'prizeDescription', 'prizeIcon', 'prizeImageUrl', 'prizeValue', 'prizeValueMax',
       'ticketCost', 'ticketCost2', 'ticketCost3', 'ticketCost4', 'isTargetBased', 'targetPlayers',
       'drawDate', 'isTest'];
     const batch = db.batch();
