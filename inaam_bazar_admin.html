@@ -1186,8 +1186,8 @@ async function startHappyHour() {
 
     // Notify all users
     await db.collection('broadcast_notifications').add({
-      title: '⚡ Happy Hour Shuru!',
-      body: `${multiplier}x Tickets — agle ${durationMin} minute tak sab kuch double!`,
+      title: '⚡ Double Tickets Shuru!',
+      body: `Agle ${durationMin} minute tak games par ${multiplier}x tickets!`,
       topic: 'all_users',
       type: 'happy_hour',
       sent: false,
@@ -4072,12 +4072,16 @@ async function viewUserHistory(uid) {
 
 // ── App Controls (maintenance + per-game switches) ───────────────────────────
 const GAME_CONTROLS = [
-  { key: 'spin', label: 'Lucky Spin', emoji: '🎡' },
-  { key: 'scratch', label: 'Scratch Card', emoji: '🎫' },
   { key: 'tbird', label: 'T-Bird', emoji: '🐦' },
-  { key: 'plinko', label: 'Ticket Drop', emoji: '🎯' },
-  { key: 'quiz', label: 'Daily Quiz', emoji: '🧠' },
+  { key: 'memory', label: 'Memory Match', emoji: '🧩' },
+  { key: 'catch', label: 'Basket Catch', emoji: '🧺' },
   { key: 'rush', label: 'Ticket Rush', emoji: '⚡' },
+  { key: 'reaction', label: 'Reaction Tap', emoji: '👆' },
+  { key: 'quiz', label: 'Daily Quiz', emoji: '🧠' },
+  // Old luck games — only in app builds 10 and older (removed in build 11)
+  { key: 'spin', label: 'Lucky Spin (purana build)', emoji: '🎡' },
+  { key: 'scratch', label: 'Scratch Card (purana build)', emoji: '🎫' },
+  { key: 'plinko', label: 'Ticket Drop (purana build)', emoji: '🎯' },
 ];
 let appControlsCache = { maintenanceMode: false, maintenanceMessage: '', games: {}, minBuild: 0 };
 
